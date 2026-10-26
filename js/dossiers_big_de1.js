@@ -1,0 +1,140 @@
+'use strict';
+/* ============================================================
+ * dossiers_big_de1.js — 全员部队档案·德军甲批（第6装甲集团军·北翼，2026-10-25）
+ * 用户需求：为每一支增援入场与开局在场的建制都写严谨简介。
+ * 字段：{ key, side, branch(体系), match[](单位名子串), name, type, strength(编成),
+ *        histDate(首投/入场), open(开局在场), photo(可空, 命中内嵌/缓存则显示), intro(史实) }
+ * 史实依据：H. M. Cole《The Ardennes: Battle of the Bulge》美军官方战史；
+ *          R. Stöber《Die Generale und Chefs des Heeres》等公开战史。不做虚构。
+ * ============================================================ */
+const SHARD_DE1 = [
+  { key: 'de_1ss', side: 'DE', branch: '党卫军', open: true,
+    match: ['党卫军第1装甲师', '警卫旗队', 'LSSAH'],
+    name: '党卫军第1装甲师「阿道夫·希特勒警卫旗队」（1. SS-Panzer-Division LSSAH）',
+    type: '装甲师（SS）',
+    strength: '第1/2装甲掷弹兵团、第1装甲团、第1炮兵团、501重装甲营配属（虎王）、侦察/歼击/工兵/高炮营',
+    histDate: '1944-12-16（开局在场）',
+    intro: '全师约2万人、坦克近百辆，是德军突击北翼的头号铁拳。派佩尔战斗群（约117辆坦克/突击炮）沿阿登森林狭窄林道向马斯河的列日-于伊方向强突，12月17日在包格涅兹制造马尔梅迪屠杀，18日进抵斯塔沃洛，却因燃料耗尽与美军死守在拉格莱兹前功尽弃。全师在埃尔森博恩 Ridge 前后损失过半，1945年1月撤往德国重整。',
+    photo: 'https://upload.wikimedia.org/wikipedia/commons/1/11/German_Tiger_II_tank_in_Stavelot%2C_Belgium%2C_21_December_1944_%28111-SC-198115%29.jpg' },
+
+  { key: 'de_12ss', side: 'DE', branch: '党卫军', open: true,
+    match: ['党卫军第12装甲师', '希特勒青年团'],
+    name: '党卫军第12装甲师「希特勒青年团」（12. SS-Panzer-Division Hitlerjugend）',
+    type: '装甲师（SS）',
+    strength: '第12/25装甲掷弹兵团、第12装甲团、第12炮兵团、侦察/歼击/工兵/高炮营',
+    histDate: '1944-12-16（开局在场）',
+    intro: '平均年龄仅18-19岁的青年师，师长克拉斯特不含糊的老兵班底。任务是从蒙绍以北突破直取安特卫普，但在埃尔森博恩 Ridge 撞上美军第2/99步兵师的死守，激战六昼夜仅推进数公里，付出约4,000人伤亡。后转投圣维特方向，1945年1月随整个第6装甲集团军撤出前线。',
+    photo: '' },
+
+  { key: 'de_ss1corps', side: 'DE', branch: '党卫军', open: true,
+    match: ['党卫军第1装甲军'],
+    name: '党卫军第1装甲军军直属部队（I. SS-Panzer-Korps）',
+    type: '军直属（SS）',
+    strength: '军属炮兵（含501火箭炮营）、工兵与勤务分队',
+    histDate: '1944-12-16（开局在场）',
+    intro: '党卫军第1装甲军负责指挥北翼主要突击（警卫旗队与青年团师）。军直属炮兵在开战首夜向美军阵地实施压制射击，勤务分队随派佩尔战斗群前推。军长为赫尔曼·普里斯党卫军上将。',
+    photo: '' },
+
+  { key: 'de_3fj', side: 'DE', branch: '国防军', open: true,
+    match: ['第3伞兵师'],
+    name: '第3伞兵师（3. Fallschirm-Jäger-Division）',
+    type: '伞兵师',
+    strength: '第5/8/9伞降步兵团、第3炮兵团、反坦克/工兵/通信营（多为空军地勤改编）',
+    histDate: '1944-12-16（开局在场）',
+    intro: '1943年底由空军地面人员新编，诺曼底战役损失殆尽后于1944年秋在德国重建。阿登战役中在青年团师南侧展开，向克灵克特-埃尔森博恩方向进攻，同样在美军防线前撞得粉碎，是北翼损失最重的师之一。',
+    photo: '' },
+
+  { key: 'de_277vgd', side: 'DE', branch: '国民掷弹兵', open: true,
+    match: ['第277国民掷弹兵师'],
+    name: '第277国民掷弹兵师（277. Volks-Grenadier-Division）',
+    type: '国民掷弹兵师',
+    strength: '第989/990/991国民掷弹兵团、第277炮兵团、歼击/工兵/通信营',
+    histDate: '1944-12-16（开局在场）',
+    intro: '1944年10月由第277步兵师残部与空军人员合编。阿登战役中在蒙绍以南展开，向埃尔森博恩方向进攻，因训练与通信不良进展极小，第一周即伤亡惨重。',
+    photo: '' },
+
+  { key: 'de_12vgd', side: 'DE', branch: '国民掷弹兵', open: true,
+    match: ['第12国民掷弹兵师'],
+    name: '第12国民掷弹兵师（12. Volks-Grenadier-Division）',
+    type: '国民掷弹兵师',
+    strength: '第27/48/89国民掷弹兵团、第12炮兵团、歼击/工兵/通信营',
+    histDate: '1944-12-16（开局在场）',
+    intro: '1944年9月在德国本土组建。阿登战役中在北翼进攻罗尔河一线的美军前哨，进展有限，后转用于圣维特方向。',
+    photo: 'https://upload.wikimedia.org/wikipedia/commons/6/61/GERMAN_TROOPS_ADVANCING_PAST_ABANDONED_AMERICAN_EQUIPMENT.jpg' },
+
+  { key: 'de_62vgd', side: 'DE', branch: '国民掷弹兵', open: true,
+    match: ['第62国民掷弹兵师'],
+    name: '第62国民掷弹兵师（62. Volks-Grenadier-Division）',
+    type: '国民掷弹兵师',
+    strength: '第164/190/1223国民掷弹兵团、第162炮兵团、歼击/工兵/通信营',
+    histDate: '1944-12-16（开局在场）',
+    intro: '在许特根森林战役中被打残后于1944年12月重建。阿登战役中在雪艾费尔以北展开，突破美军第99师防线部分地段，但缺乏后续力量扩大战果。',
+    photo: '' },
+
+  { key: 'de_326vgd', side: 'DE', branch: '国民掷弹兵', open: true,
+    match: ['第326国民掷弹兵师'],
+    name: '第326国民掷弹兵师（326. Volks-Grenadier-Division）',
+    type: '国民掷弹兵师',
+    strength: '第751/752/753国民掷弹兵团、第326炮兵团、歼击/工兵/通信营',
+    histDate: '1944-12-16（开局在场）',
+    intro: '1944年11月新建。阿登战役中在第66军序列内进攻雪艾费尔以北的洛斯海姆-格林克尔特方向，遭美军第2师与第99师顽强阻击，损失严重后于12月下旬撤出休整。',
+    photo: '' },
+
+  { key: 'de_6pza', side: 'DE', branch: '党卫军', open: true,
+    match: ['第6装甲集团军直属部队'],
+    name: '第6装甲集团军直属部队（6. Panzer-Armee）',
+    type: '集团军直属（SS）',
+    strength: '第501火箭炮营、军属工兵/高炮/勤务营分队（约7个营）',
+    histDate: '1944-12-16（开局在场）',
+    intro: '第6装甲集团军（党卫军一级上将泽普·迪特里希）是阿登攻势主力，直属部队包括火箭炮、工兵与高炮分队，负责在开战首夜以集中炮火压制美军前哨，并保障派佩尔战斗群的推进走廊。',
+    photo: '' },
+
+  { key: 'de_272vgd', side: 'DE', branch: '国民掷弹兵', open: true,
+    match: ['第272国民掷弹兵师'],
+    name: '第272国民掷弹兵师（272. Volks-Grenadier-Division）',
+    type: '国民掷弹兵师',
+    strength: '第980/981/982国民掷弹兵团、第272炮兵团、歼击/工兵/通信营',
+    histDate: '1944-12-16（开局在场）',
+    intro: '1944年秋由第272步兵师残部重建。阿登战役中在蒙绍-艾费尔方向作为第6装甲集团军二线部队，任务是在突击部队打开缺口后跟进扩大战果，实际大部时间用于堵塞美军反突击造成的侧翼危机。',
+    photo: '' },
+
+  { key: 'de_246vgd', side: 'DE', branch: '国民掷弹兵', open: true,
+    match: ['第246国民掷弹兵师'],
+    name: '第246国民掷弹兵师（246. Volks-Grenadier-Division）',
+    type: '国民掷弹兵师',
+    strength: '第352/404/689国民掷弹兵团、第246炮兵团、歼击/工兵/通信营',
+    histDate: '1944-12-16（开局在场）',
+    intro: '1944年9月由第246步兵师残部重建。阿登战役中作为北翼二线师，负责掩护第6装甲集团军左翼与艾费尔纵深的补给线，未参与主要突击。',
+    photo: '' },
+
+  { key: 'de_12ss_reinf', side: 'DE', branch: '党卫军', open: false,
+    match: ['党卫军第2装甲师（帝国）', '党卫军第2装甲师'],
+    name: '党卫军第2装甲师「帝国」（2. SS-Panzer-Division Das Reich）',
+    type: '装甲师（SS）',
+    strength: '第3/4装甲掷弹兵团（元首/德意志团）、第2装甲团、第2炮兵团、侦察/歼击/工兵/高炮营',
+    histDate: '1944-12-23（增援）',
+    intro: '武装党卫军最老牌的师之一，诺曼底战役损失惨重后撤至德国帕德博恩重建，配发全新豹式与虎王。阿登战役中于12月23日起作为第6装甲集团军预备队投入中路圣维特-维尔萨姆方向，但因燃料与道路限制进展迟缓，1945年1月初在格林克尔特-瓦尔萨姆一线受阻后随集团军东撤。',
+    photo: 'https://upload.wikimedia.org/wikipedia/commons/e/e2/MortainDasReich.jpg' },
+
+  { key: 'de_9ss_reinf', side: 'DE', branch: '党卫军', open: false,
+    match: ['党卫军第9装甲师', '霍恩施陶芬'],
+    name: '党卫军第9装甲师「霍恩施陶芬」（9. SS-Panzer-Division Hohenstaufen）',
+    type: '装甲师（SS）',
+    strength: '第9/19/20装甲掷弹兵团、第9装甲团、第9炮兵团、侦察/歼击/工兵/高炮营',
+    histDate: '1944-12-23（增援）',
+    intro: '阿纳姆战役后撤至德国休整的精锐预备队。阿登战役中于12月23日起随党卫军第2装甲军投入，原计划增援派佩尔打通马斯河，实际被转用于堵击美军第82空降师与第7装甲师在圣维特-维尔萨姆方向的反击，1945年1月随集团军东撤。',
+    photo: '' },
+
+  { key: 'de_ss2corps', side: 'DE', branch: '党卫军', open: false,
+    match: ['党卫军第2装甲军'],
+    name: '党卫军第2装甲军军直属部队（II. SS-Panzer-Korps）',
+    type: '军直属（SS）',
+    strength: '军属炮兵（含火箭炮营）、工兵与勤务分队',
+    histDate: '1944-12-23（增援）',
+    intro: '党卫军第2装甲军（军长比特里希）率「帝国」与「霍恩施陶芬」师于12月23日进入战场，作为第6装甲集团军预备队投入中路。军直属炮兵负责压制圣维特-维尔萨姆走廊内的美军阵地。',
+    photo: '' },
+];
+
+/* 浏览器 <script> 直载兼容：node 走 module.exports，浏览器推入分片汇合点 */
+if (typeof module !== 'undefined' && module.exports) { module.exports = SHARD_DE1; }
+else { (globalThis.__DOSSIER_SHARDS = globalThis.__DOSSIER_SHARDS || []).push(...SHARD_DE1); }

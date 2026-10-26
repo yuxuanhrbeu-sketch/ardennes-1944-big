@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: 自检（Node ${{ matrix.node }}）
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: 构建单文件成品
+        run: node build.js
+
+      - name: 成品存在且非空
+        run: |
+          test -s dist/ardennes44_big.html
+          echo "dist: $(du -h dist/ardennes44_big.html | cut -f1)"
+          test -s dist/ardennes44_classic.html
+
+      - name: 开局静态校验（35 项）
+        run: node tools/check_big.js
+
+      - name: OOB 编制自检（29 项）
+        run: node tools/oob_big/check_oob_big.js
+
+      - name: 规则 / 数据核查器
+        run: |
+          node qa/type_buffs_check.js
+          node qa/town_supply_flip_check.js
+          node qa/hq_command_check.js
+          node qa/dossier_coverage_check.js
+          node qa/achv_check.js
+          node qa/reinforce_supply_check.js
+
+      - name: 地图 / 城镇合规
+        run: |
+          node qa/scan_fake_names.js
+          node qa/diag_towns.js
+          node qa/coverage_area.js
+          node qa/wilderness_check.js

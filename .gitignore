@@ -1,0 +1,25 @@
+# ── 构建产物（由 `node build.js` 生成；CI / GitHub Pages 会自动重建） ──
+dist/
+
+# ── 开发过程截图（tools/shot.js 产出；README 用图已挑好放在 docs/screenshots/） ──
+shots/
+
+# ── 抓图暂存区（tools/fetch_photos_bulk.js 的下载缓存，不参与构建、不被游戏引用） ──
+vendor/photos/bulk/
+
+# ── QA 生成物（可随时重跑生成，不入库） ──
+qa/_audit_result.json
+qa/_fmt_list.json
+qa/_tmp_*.txt
+qa/render_*.png
+
+# ── 依赖 / 编辑器 / 系统 ──
+node_modules/
+package-lock.json
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+.vscode/
+.idea/
+*.swp

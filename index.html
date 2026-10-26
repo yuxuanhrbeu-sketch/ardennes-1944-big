@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>阿登1944 · 突出部战役兵棋推演</title>
+<style>
+  :root {
+    --de-color: #8a9284;
+    --us-color: #6fa3cf;
+    --bg-panel: rgba(12, 16, 20, 0.86);
+    --edge: rgba(255, 255, 255, 0.1);
+    --gold: #d8b74a;
+    /* 第二十轮：制图风格 token（发丝线 / 黄铜 / 等宽制表数字 / 窄体标题） */
+    --hair: rgba(255, 255, 255, 0.09);
+    --brass: #c8a94a;
+    --rule: rgba(216, 183, 74, 0.30);
+    --mono: Consolas, "Cascadia Mono", "DejaVu Sans Mono", monospace;
+    --disp: Bahnschrift, "DIN Alternate", "Arial Narrow", "Microsoft YaHei", sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0b0e12;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif; color: #e8e4d8;
+    /* 手机端: 关掉橡皮筋回弹与双击高亮; -webkit-text-size-adjust 防止 iOS 横屏自动放大字号 */
+    overscroll-behavior: none; -webkit-text-size-adjust: 100%; -webkit-tap-highlight-color: transparent; }
+  /* 画布接管全部手势: touch-action:none 让浏览器不再对这块区域做滚动/双击缩放,
+     双指捏合与拖动才不会被引擎以外的行为抢走(见 render.js 的多指手势实现) */
+  #scene { position: absolute; inset: 0; touch-action: none; }
+  #scene canvas { display: block; touch-action: none; }
+
+  /* ---------- 顶栏 ---------- */
+  #topbar {
+    position: absolute; top: 0; left: 0; right: 0; height: 54px;
+    background: var(--bg-panel); border-bottom: 1px solid var(--edge);
+    display: flex; align-items: center; gap: 14px; padding: 0 16px; z-index: 10;
+    font-size: 13px;
+  }
+  #topbar .title { font-weight: bold; font-size: 16px; letter-spacing: 2px; color: var(--gold); }
+  #topbar .sep { width: 1px; height: 26px; background: var(--edge); }
+  #topbar .stat { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+  #topbar .label { color: #9aa0a6; }
+  #phaseTag { padding: 2px 10px; border-radius: 3px; font-weight: bold; }
+  #phaseTag.DE { background: #4a4f45; color: #cfd6c8; }
+  #phaseTag.US { background: #2f4a63; color: #cfe3f5; }
+  #fuelBar { width: 90px; height: 8px; background: #222; border-radius: 4px; overflow: hidden; }
+  #fuelFill { height: 100%; background: linear-gradient(90deg, #b0653a, #d8b74a); }
+  #topbar .grow { flex: 1; }
+  /* 第二十九轮: 顶栏拆成「状态组 + 按钮组」两个容器。
+     桌面端样式与拆分前完全一致; 窄屏下按钮组整体折叠成菜单、状态组横向滚动(见文末 @media)。 */
+  #topStats, #topBtns { display: flex; align-items: center; gap: 14px; }
+  #topBtns { gap: 6px; }
+  #btnMenu { display: none; }
+  /* 相机控制条: 左下角常驻(放大/缩小/全图), 触屏没有滚轮时用它兜底 */
+  #camCtl { position: absolute; left: 10px; bottom: 52px; z-index: 10; display: flex; gap: 6px; }
+  #camCtl button { width: 38px; height: 38px; padding: 0; font-size: 17px; line-height: 1;
+    border-radius: 5px; background: rgba(16, 21, 26, 0.88); }
+  button {
+    background: #2a3138; color: #e8e4d8; border: 1px solid var(--edge);
+    padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px;
+    font-family: inherit; transition: background 0.15s;
+  }
+  button:hover { background: #3a434c; }
+  button.primary { background: #7a5c22; border-color: #a5822f; }
+  button.primary:hover { background: #96742e; }
+  button.danger { background: #6b2f28; }
+  button:disabled { opacity: 0.45; cursor: default; }
+  button.active { background: #55612e; border-color: #7d9140; }
+  /* 音效开关：关闭态明确变暗（不靠颜色单独传达状态，文字同步改为「音效 关」） */
+  #btnSfx.off, #btnDosPop.off { opacity: 0.5; }
+  /* 启动状态/失败面板(原版35轮移植) */
+  #bootStatus { position: absolute; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; background: rgba(5, 7, 10, 0.88); }
+  #bootStatus[hidden] { display: none; }
+  #bootStatus .bs-box { min-width: 320px; max-width: 88%; padding: 22px 26px; text-align: center; background: #14181d; border: 1px solid var(--rule); border-radius: 3px; }
+  #bootStatus .bs-kicker { font-family: var(--mono); font-size: 10px; letter-spacing: 2.6px; color: #78808a; }
+  #bootStatus .bs-msg { margin-top: 10px; font-family: var(--disp); font-size: 17px; letter-spacing: 1px; color: #e8e4d8; }
+  #bootStatus .bs-hint { margin-top: 8px; font-size: 12.5px; line-height: 1.8; color: #9aa0a6; }
+  #bootStatus .bs-foot { margin-top: 16px; display: flex; gap: 10px; justify-content: center; }
+  #bootStatus.error .bs-msg { color: #e8907a; }
+  #bootStatus .spinner { display: inline-block; width: 13px; height: 13px; margin-right: 8px; vertical-align: -2px; border: 2px solid rgba(216,183,74,.28); border-top-color: var(--brass); border-radius: 50%; animation: bsSpin .9s linear infinite; }
+  @keyframes bsSpin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { #bootStatus .spinner { animation: none; } }
+
+  /* ---------- 左侧单位面板 ---------- */
+  #unitPanel {
+    position: absolute; left: 12px; top: 66px; width: 250px;
+    background: var(--bg-panel); border: 1px solid var(--edge); border-radius: 6px;
+    padding: 12px; z-index: 10; display: none;
+  }
+  #unitPanel h3 { font-size: 15px; margin-bottom: 2px; }
+  #unitPanel .type-tag { font-size: 11px; color: #9aa0a6; margin-bottom: 8px; }
+  #unitPanel .stats { display: flex; gap: 10px; margin: 8px 0; }
+  #unitPanel .stat-box { flex: 1; text-align: center; background: rgba(255,255,255,0.05);
+    border-radius: 4px; padding: 6px 0; }
+  #unitPanel .stat-box .v { font-size: 20px; font-weight: bold; color: var(--gold); }
+  #unitPanel .stat-box .k { font-size: 11px; color: #9aa0a6; }
+  #unitPanel .orgwrap { margin: 8px 0; }
+  #unitPanel .orgbar { height: 10px; background: #222; border-radius: 5px; overflow: hidden; }
+  #unitPanel .orgfill { height: 100%; transition: width 0.3s; }
+  #unitPanel .state-line { font-size: 12px; margin: 4px 0; }
+  #unitPanel .btns { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  #unitPanel .btns button { flex: 1; padding: 6px 4px; font-size: 12px; }
+
+  /* ---------- 战报 ---------- */
+  #logPanel {
+    position: absolute; right: 12px; top: 66px; width: 330px; bottom: 52px;
+    background: var(--bg-panel); border: 1px solid var(--edge); border-radius: 6px;
+    z-index: 10; display: flex; flex-direction: column;
+  }
+  #logPanel .head { display: flex; align-items: center; gap: 8px; width: 100%;
+    padding: 8px 12px; border: 0; border-bottom: 1px solid var(--edge); border-radius: 5px 5px 0 0;
+    background: transparent; text-align: left; font-family: inherit; font-weight: bold;
+    font-size: 13px; color: var(--gold); letter-spacing: 2px; cursor: pointer; }
+  #logPanel .head:hover { background: rgba(255, 255, 255, 0.05); }
+  #logPanel .head .ttl { flex: 1; }
+  #logPanel .head .chev { font-size: 12px; letter-spacing: 0; transition: transform 0.18s; }
+  #logPanel.collapsed .head .chev { transform: rotate(-90deg); }
+  #logPanel .head .unread { font-size: 11px; letter-spacing: 0; font-weight: bold; color: #10161c;
+    background: var(--gold); border-radius: 9px; padding: 0 6px; line-height: 16px; }
+  #logPanel.collapsed { bottom: auto; }
+  #logPanel.collapsed #logList { display: none; }
+  #logList { flex: 1; overflow-y: auto; padding: 8px 12px; font-size: 12px; line-height: 1.7; }
+  #logList .de { color: #b8c4b0; }
+  #logList .us { color: #a8c8e8; }
+  #logList .sys { color: #d8b74a; font-weight: bold; }
+  #logList .warn { color: #e8907a; }
+  #logList .hist { color: #c9b98a; font-style: italic; border-left: 2px solid #8a7a50; padding-left: 8px; margin: 4px 0; }
+  #logList::-webkit-scrollbar { width: 6px; }
+  #logList::-webkit-scrollbar-thumb { background: #3a434c; border-radius: 3px; }
+
+  /* ---------- 底部提示 ---------- */
+  #hintbar {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 40px;
+    background: var(--bg-panel); border-top: 1px solid var(--edge);
+    display: flex; align-items: center; padding: 0 16px; gap: 20px;
+    font-size: 12px; color: #9aa0a6; z-index: 10;
+  }
+  #hintbar b { color: #e8e4d8; }
+  /* 提示语两套共存, 由 @media 按指针类型切换(触屏不该告诉用户去按 WASD) */
+  .hint-touch { display: none; }
+
+  /* ---------- 悬浮提示 ---------- */
+  #tooltip {
+    position: absolute; pointer-events: none; z-index: 20;
+    background: rgba(8, 10, 14, 0.92); border: 1px solid var(--edge); border-radius: 4px;
+    padding: 8px 10px; font-size: 12px; display: none; max-width: 260px; line-height: 1.6;
+  }
+
+  /* ---------- 战力比 / 结算弹窗（第二十轮：制图风格，直角 + 发丝线 + 等宽数字） ---------- */
+  #oddsPopup {
+    position: absolute; bottom: 56px; left: 50%; transform: translateX(-50%);
+    background: #10151a; border: 1px solid var(--hair); border-top: 2px solid var(--brass); border-radius: 2px;
+    padding: 13px 20px; z-index: 15; display: none; text-align: center; min-width: 380px;
+  }
+  #oddsPopup .odds-big { font-family: var(--disp); font-size: 24px; font-weight: 700;
+    letter-spacing: 2px; color: var(--brass); margin: 5px 0; }
+  #oddsPopup .dice { font-family: var(--mono); font-size: 17px; margin: 7px 0 5px; letter-spacing: 2px; color: #e8e4d8; }
+  #oddsPopup .detail { font-size: 12px; line-height: 1.6; color: #939aa2; margin-bottom: 7px; }
+  #oddsPopup .btns { display: flex; gap: 10px; justify-content: center; margin-top: 9px; }
+  #oddsPopup .btns button { border-radius: 2px; letter-spacing: 2px; }
+  /* 战损拆分：攻/守分列（组织度实扣 + 歼灭建制数） */
+  #oddsPopup .loss-wrap { display: flex; gap: 10px; justify-content: center; margin: 7px 0 2px; }
+  #oddsPopup .loss { display: flex; flex-direction: column; align-items: center; gap: 1px;
+    min-width: 120px; padding: 6px 12px; border-radius: 2px;
+    background: #171c22; border: 1px solid var(--hair); }
+  #oddsPopup .loss .loss-k { font-family: var(--mono); font-size: 9.5px; letter-spacing: 1.4px; color: #78808a; }
+  #oddsPopup .loss .loss-v { font-family: var(--mono); font-size: 15px; font-weight: 700;
+    letter-spacing: .3px; font-variant-numeric: tabular-nums; }
+  #oddsPopup .loss .loss-d { font-size: 11px; color: #8f959b; }
+  #oddsPopup .loss.atk { border-left: 3px solid rgba(232,160,106,.55); }
+  #oddsPopup .loss.def { border-left: 3px solid rgba(127,176,216,.55); }
+  #oddsPopup .loss.atk .loss-v { color: #e8a06a; }
+  #oddsPopup .loss.def .loss-v { color: #7fb0d8; }
+
+  /* ---------- 回合横幅 ---------- */
+  #banner {
+    position: absolute; top: 38%; left: 0; right: 0; text-align: center; z-index: 30;
+    pointer-events: none; opacity: 0; transition: opacity 0.4s;
+  }
+  #banner .big { font-size: 42px; font-weight: bold; letter-spacing: 8px;
+    text-shadow: 0 2px 12px rgba(0,0,0,0.8); }
+  #banner .sub { font-size: 16px; color: #cfc9b8; letter-spacing: 4px; margin-top: 6px;
+    text-shadow: 0 1px 8px rgba(0,0,0,0.8); }
+
+  /* ---------- 模态框 ---------- */
+  #modal {
+    position: absolute; inset: 0; background: rgba(5, 7, 10, 0.78); z-index: 40;
+    display: none; align-items: center; justify-content: center;
+  }
+  #modal .box {
+    background: #14181d; border: 1px solid var(--edge); border-radius: 10px;
+    padding: 28px 34px; max-width: 640px; width: 92%; max-height: 86vh; overflow-y: auto;
+  }
+  #modal h1 { font-size: 24px; color: var(--gold); letter-spacing: 3px; margin-bottom: 4px; }
+  #modal h2 { font-size: 16px; color: #cfc9b8; margin: 14px 0 8px; }
+  /* ========== 开局界面：制图 · 作战命令风格（去 AI 味：直角 / 发丝线 / 编号 / 制表数字） ========== */
+  #modal .box.start-box { max-width: 660px; padding: 0; border-radius: 3px; }
+  #modal .sd-head { position: relative; padding: 22px 30px 16px; border-bottom: 1px solid var(--hair); }
+  #modal .sd-kicker { font-family: var(--mono); font-size: 10px; letter-spacing: 2.6px; color: #78808a; text-transform: uppercase; }
+  #modal .sd-head h1 { font-family: var(--disp); font-size: 31px; font-weight: 700; letter-spacing: 7px; color: #eee9dc; margin: 7px 0 5px; }
+  #modal .sd-head h1 span { color: var(--brass); letter-spacing: 3px; }
+  #modal .sd-sub { font-size: 12.5px; letter-spacing: .4px; color: #8f969e; }
+  #modal .sd-stamp {
+    position: absolute; right: 30px; top: 24px; padding: 4px 8px; border: 1px solid var(--rule);
+    font-family: var(--mono); font-size: 9.5px; line-height: 1.75; letter-spacing: 1.3px;
+    color: var(--brass); text-align: center;
+  }
+  #modal .sd-h { display: flex; align-items: center; gap: 9px; margin: 18px 30px 9px;
+    font-size: 12.5px; font-weight: 700; letter-spacing: 1.6px; color: #cfc9b8; }
+  #modal .sd-h::before { content: ''; flex: none; width: 7px; height: 7px; background: var(--brass); }
+  #modal .sd-h::after { content: ''; flex: 1; height: 1px; background: var(--hair); }
+  #modal .sd-h .sd-en { font-family: var(--mono); font-size: 9.5px; font-weight: 400; letter-spacing: 1.8px; color: #6f767d; }
+  /* 剧本：编号 + 主副标题的行式清单（左侧 3px 选中条，不做圆角卡片与发光） */
+  #modal .scen-list { margin: 0 30px; }
+  #modal .scen { display: flex; gap: 13px; align-items: flex-start; margin: 0; padding: 10px 12px 11px 11px;
+    border: 0; border-left: 3px solid transparent; border-bottom: 1px solid var(--hair); border-radius: 0;
+    cursor: pointer; transition: background .12s, border-left-color .12s; }
+  #modal .scen:first-child { border-top: 1px solid var(--hair); }
+  #modal .scen:hover { background: rgba(255,255,255,.03); border-left-color: rgba(255,255,255,.2); }
+  #modal .scen.sel { background: rgba(216,183,74,.075); border-left-color: var(--brass); }
+  #modal .sc-idx { flex: none; padding-top: 3px; font-family: var(--mono); font-size: 11px; letter-spacing: 1px; color: #6b737b; }
+  #modal .scen.sel .sc-idx { color: var(--brass); }
+  #modal .sc-main { flex: 1; min-width: 0; }
+  #modal .scen .n { font-size: 14.5px; font-weight: 700; letter-spacing: .6px; color: #e8e4d8; }
+  #modal .scen .s { margin: 3px 0 4px; font-family: var(--mono); font-size: 10.5px; letter-spacing: .6px; color: var(--brass); }
+  #modal .scen .d { font-size: 12px; line-height: 1.7; color: #8f969e; }
+  #modal .sc-tick { flex: none; padding-top: 4px; font-family: var(--mono); font-size: 9.5px; letter-spacing: 1.4px;
+      .sc-origin { display:inline-block; margin-left:6px; padding:0 5px; font-size:10px; color:#d8c48a; border:1px solid #8a7a4a; border-radius:3px; vertical-align:2px; }
+    color: var(--brass); visibility: hidden; }
+  #modal .scen.sel .sc-tick { visibility: visible; }
+  /* 角色：2×2 命令块，代号方章选中后反白 */
+  #modal .role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 30px; }
+  #modal .side-btn { display: flex; align-items: center; gap: 9px; padding: 9px 11px; text-align: left;
+    background: #1a1f25; border: 1px solid var(--hair); border-left: 3px solid rgba(255,255,255,.12);
+    border-radius: 2px; font-size: 13px; color: #cfc9b8;
+    transition: background .12s, border-color .12s; }
+  #modal .side-btn:hover { background: #232a31; border-left-color: rgba(255,255,255,.3); }
+  #modal .side-btn.sel { background: rgba(216,183,74,.10); border-color: rgba(216,183,74,.34);
+    border-left-color: var(--brass); color: #f2ecd8; }
+  #modal .sb-code { flex: none; width: 18px; height: 18px; line-height: 16px; text-align: center;
+    font-family: var(--mono); font-size: 10px; color: #7c848c; border: 1px solid var(--hair); border-radius: 1px; }
+  #modal .side-btn.sel .sb-code { background: var(--brass); border-color: var(--brass); color: #12161b; font-weight: 700; }
+  #modal .sb-t { display: block; font-weight: 700; letter-spacing: .5px; }
+  #modal .sb-d { display: block; margin-top: 2px; font-size: 11px; font-weight: 400; letter-spacing: .3px; color: #868d95; }
+  #modal .side-btn.sel .sb-d { color: #bdb098; }
+  /* 当前选择：命令摘要条 */
+  #modal .sel-hint { display: flex; align-items: center; gap: 9px; margin: 16px 30px 0; padding: 8px 11px;
+    background: #171c22; border: 1px solid var(--hair); border-left: 3px solid var(--brass);
+    font-size: 12px; letter-spacing: .3px; color: #e8e4d8; }
+  #modal .sel-hint .sh-k { font-family: var(--mono); font-size: 9.5px; letter-spacing: 1.8px; color: var(--brass); }
+  /* 独立选项：取消回合限制（第二十三轮）——与角色块同款直角命令块；开启=左黄铜条 + 方框打勾 + 状态章 */
+  #modal .opt-toggle { display: flex; align-items: center; gap: 10px; box-sizing: border-box;
+    width: calc(100% - 60px); margin: 0 30px; padding: 10px 11px; text-align: left;
+    background: #1a1f25; border: 1px solid var(--hair); border-left: 3px solid rgba(255,255,255,.12);
+    border-radius: 2px; font-size: 13px; color: #cfc9b8; transition: background .12s, border-color .12s; }
+  #modal .opt-toggle:hover { background: #232a31; border-left-color: rgba(255,255,255,.3); }
+  #modal .opt-toggle.on { background: rgba(216,183,74,.10); border-color: rgba(216,183,74,.34);
+    border-left-color: var(--brass); color: #f2ecd8; }
+  #modal .ot-box { flex: none; position: relative; width: 16px; height: 16px; border-radius: 1px;
+    background: #12161b; border: 1px solid var(--hair); }
+  #modal .opt-toggle.on .ot-box { background: var(--brass); border-color: var(--brass); }
+  #modal .opt-toggle.on .ot-box::after { content: ''; position: absolute; left: 5px; top: 1px; width: 4px; height: 9px;
+    border: solid #12161b; border-width: 0 2px 2px 0; transform: rotate(42deg); }
+  #modal .ot-body { flex: 1; }
+  #modal .ot-t { display: block; font-weight: 700; letter-spacing: .5px; }
+  #modal .ot-d { display: block; margin-top: 2px; font-size: 11px; font-weight: 400; letter-spacing: .3px; color: #868d95; }
+  #modal .ot-d b { color: var(--gold); }
+  #modal .opt-toggle.on .ot-d { color: #bdb098; }
+  #modal .ot-state { flex: none; padding: 2px 7px; border-radius: 1px; font-family: var(--mono);
+    font-size: 10px; letter-spacing: 1px; color: #868d95; border: 1px solid var(--hair); }
+  #modal .opt-toggle.on .ot-state { background: var(--brass); border-color: var(--brass); color: #12161b; font-weight: 700; }
+  #modal .start-box .foot { margin: 18px 0 0; padding: 14px 30px 16px; gap: 10px;
+    border-top: 1px solid var(--hair); background: #111519; }
+  #modal .start-box .foot button { padding: 8px 22px; border-radius: 2px; letter-spacing: 3px; }
+  @media (max-width: 620px) {
+    #modal .role-grid { grid-template-columns: 1fr; }
+    #modal .sd-head { padding: 18px 20px 14px; }
+    #modal .sd-stamp { display: none; }
+    #modal .sd-h, #modal .scen-list, #modal .role-grid, #modal .sel-hint { margin-left: 20px; margin-right: 20px; }
+    #modal .opt-toggle { margin-left: 20px; margin-right: 20px; width: calc(100% - 40px); }
+    #modal .start-box .foot { padding-left: 20px; padding-right: 20px; }
+  }
+  #modal .rules { font-size: 13px; line-height: 1.9; color: #cfc9b8; }
+  #modal .rules b { color: var(--gold); }
+  #modal .changelog { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--edge); font-size: 12.5px; line-height: 1.75; color: #a9b0ba; }
+  #modal .changelog > b { color: var(--gold); display: block; margin-bottom: 6px; }
+  #modal .changelog ul { margin: 0; padding-left: 18px; }
+  #modal .changelog li { margin: 4px 0; }
+  #modal .changelog li b { color: #cfc9b8; }
+  /* ---------- 援军档案卡(2026-10) ---------- */
+  #modal .dossier-box { max-width: 700px; }
+  #modal .dossier { display: flex; gap: 18px; align-items: flex-start; }
+  #modal .ds-photo { flex: 0 0 264px; max-width: 264px; }
+  #modal .ds-img {
+    display: block; width: 100%; height: auto; border-radius: 3px;
+    border: 6px solid #e9e3d2; background: #26241f;
+    box-shadow: 0 6px 18px rgba(0,0,0,.55);
+    filter: sepia(.28) contrast(1.06) brightness(.98);
+  }
+  #modal .ds-fallback {
+    position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    aspect-ratio: 4 / 3; border-radius: 3px; border: 6px solid #e9e3d2;
+    background: linear-gradient(160deg, #7a6a4c, #4e422f 72%);
+    box-shadow: 0 6px 18px rgba(0,0,0,.55);
+    color: #f6efdd; text-align: center; padding: 14px; overflow: hidden;
+  }
+  #modal .ds-fallback::after { content: ''; position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 58px rgba(0,0,0,.6); }
+  #modal .ds-fallback[hidden] { display: none; }   /* 作者样式 display:flex 会盖过 UA 的 [hidden]，必须显式关掉 */
+  #modal .ds-fb-name { font-size: 21px; font-weight: bold; letter-spacing: 2px; line-height: 1.45; text-shadow: 0 2px 6px rgba(0,0,0,.55); }
+  #modal .ds-fb-type { margin-top: 6px; font-size: 13px; color: #ded3b6; }
+  #modal .ds-fb-note { margin-top: 12px; font-size: 11px; color: #c0b28f; border-top: 1px dashed rgba(255,255,255,.28); padding-top: 8px; }
+  #modal .ds-cap { margin-top: 8px; font-size: 11.5px; line-height: 1.5; color: #9aa0a6; }
+  #modal .ds-info { flex: 1 1 auto; min-width: 0; }
+  #modal .ds-tag { font-size: 12px; letter-spacing: 1px; margin-bottom: 4px; }
+  #modal .ds-tag.us { color: #a8c8e8; }
+  #modal .ds-tag.de { color: #e8b0a8; }
+  #modal .ds-info h1 { font-size: 20px; letter-spacing: 1px; margin: 2px 0 8px; }
+  #modal .ds-meta { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: #9aa0a6; margin-bottom: 8px; }
+  #modal .ds-str { font-size: 12.5px; color: #b9b1a0; margin-bottom: 8px; }
+  #modal .ds-intro { font-size: 13px; line-height: 1.85; color: #cfc9b8; }
+  #modal .ds-credit { margin-top: 12px; font-size: 11px; line-height: 1.5; color: #7f868d; border-top: 1px solid var(--edge); padding-top: 8px; }
+  @media (max-width: 560px) {
+    #modal .dossier { flex-direction: column; }
+    #modal .ds-photo { flex: none; max-width: 100%; width: 100%; }
+  }
+  #modal .foot { display: flex; gap: 10px; margin-top: 16px; justify-content: flex-end; }
+  /* ========== 终局结算：战报（After Action Report）风格，直角 / 发丝线 / 制表数字 ========== */
+  #modal .box.aar-box { max-width: 720px; border-radius: 3px; }
+  #modal .ov-kicker { font-family: var(--mono); font-size: 10px; letter-spacing: 2.4px; color: #78808a; text-transform: uppercase; }
+  #modal .ov-result { font-family: var(--disp); font-size: 27px; font-weight: 700; letter-spacing: 5px; margin: 6px 0 10px; }
+  #modal .ov-result.de { color: #b9c4af; }
+  #modal .ov-result.us { color: #a3c3e0; }
+  #modal .ov-stats { display: flex; margin: 12px 0 2px; border: 1px solid var(--hair); }
+  #modal .ov-stats .os { flex: 1; padding: 7px 11px; border-left: 1px solid var(--hair); }
+  #modal .ov-stats .os:first-child { border-left: 0; }
+  #modal .ov-stats .os-k { font-family: var(--mono); font-size: 9.5px; letter-spacing: 1.4px; color: #78808a; }
+  #modal .ov-stats .os-v { margin-top: 3px; font-family: var(--mono); font-size: 15px; font-weight: 700; color: #e8e4d8; font-variant-numeric: tabular-nums; }
+  #modal .ov-end { margin: 12px 0 2px; padding: 9px 13px; border-left: 3px solid var(--rule); background: #141a20;
+    font-size: 13.5px; line-height: 1.85; color: #cfc9b8; }
+  #modal .ov-note { margin-top: 12px; padding-top: 9px; border-top: 1px solid var(--hair); }
+  #modal .ov-note > summary { cursor: pointer; list-style: none; font-family: var(--mono); font-size: 10.5px;
+    letter-spacing: 1.4px; color: #8f959b; }
+  #modal .ov-note > summary::-webkit-details-marker { display: none; }
+  #modal .ov-note > summary::before { content: '▸ '; color: var(--brass); }
+  #modal .ov-note[open] > summary { color: var(--brass); }
+  #modal .ov-note[open] > summary::before { content: '▾ '; }
+  /* ---------- 终局胜利画面 · 历史照片 + 鼓舞话语（第十六轮 / 第二十轮改版） ---------- */
+  #modal .vict-hero { display: flex; gap: 16px; align-items: flex-start; margin: 14px 0 6px;
+    padding-top: 14px; border-top: 1px solid var(--hair); }
+  #modal .vh-photo { flex: 0 0 216px; max-width: 216px; }
+  #modal .vh-body { flex: 1 1 auto; min-width: 0; }
+  #modal .vh-degree {
+    display: inline-block; font-family: var(--mono); font-size: 9.5px; letter-spacing: 1.6px;
+    padding: 2px 8px; border: 1px solid var(--rule); border-radius: 0; color: var(--brass); margin-bottom: 7px;
+  }
+  #modal .vict-hero.de .vh-degree { color: #c9a89f; border-color: rgba(201,168,159,.40); }
+  #modal .vict-hero.us .vh-degree { color: #9fbdd8; border-color: rgba(159,189,216,.40); }
+  #modal .vh-title { font-family: var(--disp); font-size: 19px; font-weight: 700; letter-spacing: 3px;
+    color: var(--brass); margin-bottom: 7px; }
+  #modal .vict-hero.de .vh-title { color: #cbb2a6; }
+  #modal .vict-hero.us .vh-title { color: #aec9e2; }
+  #modal .vh-cheer { padding-left: 11px; border-left: 2px solid var(--rule);
+    font-size: 13px; line-height: 1.9; color: #c6c0b2; }
+  #modal .vh-credit { margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--hair);
+    font-family: var(--mono); font-size: 10px; line-height: 1.6; letter-spacing: .3px; color: #757c84; }
+  #modal .vict-hero .ds-img { filter: sepia(.32) contrast(1.08) brightness(.97); border-radius: 0; border-width: 5px; }
+  @media (max-width: 620px) {
+    #modal .vict-hero { flex-direction: column; }
+    #modal .vh-photo { flex: none; max-width: 100%; width: 100%; }
+  }
+  /* ---------- 开局指挥官简报（第十七轮） ---------- */
+  #modal .briefing-box { max-width: 760px; }
+  #modal .briefing { display: flex; gap: 18px; align-items: flex-start; }
+  #modal .br-photo { flex: 0 0 232px; max-width: 232px; }
+  #modal .br-body { flex: 1 1 auto; min-width: 0; }
+  #modal .br-tag { font-size: 12px; letter-spacing: 1px; color: #9aa0a6; margin-bottom: 4px; }
+  #modal .br-body h1 { font-size: 21px; letter-spacing: 1px; margin: 2px 0 2px; }
+  #modal .br-post { font-size: 12.5px; color: #b9b1a0; margin-bottom: 10px; }
+  #modal .br-chat { max-height: 40vh; overflow-y: auto; padding-right: 6px; }
+  #modal .br-msg { margin: 8px 0; }
+  #modal .br-bubble {
+    position: relative; display: inline-block; max-width: 100%;
+    background: rgba(216,183,74,0.07); border: 1px solid var(--edge); border-radius: 10px;
+    border-top-left-radius: 2px; padding: 9px 13px;
+    font-size: 13px; line-height: 1.9; color: #cfc9b8;
+  }
+  #modal .br-bubble::before {
+    content: ''; position: absolute; left: -6px; top: 12px;
+    border: 6px solid transparent; border-right-color: var(--edge); border-left: 0;
+  }
+  #modal .br-credit { margin-top: 10px; font-size: 11px; line-height: 1.6; color: #7f868d; border-top: 1px solid var(--edge); padding-top: 8px; }
+  @media (max-width: 560px) {
+    #modal .briefing { flex-direction: column; }
+    #modal .br-photo { flex: none; max-width: 100%; width: 100%; }
+  }
+
+  /* ---------- 终局战损明细（第十三/二十轮：制表风格） ---------- */
+  #modal .lossTable { margin: 16px 0 4px; max-width: 100%; font-size: 13px; border-top: 2px solid var(--rule); }
+  #modal .lt-head, #modal .lt-row { display: grid; grid-template-columns: 1fr 118px 118px; gap: 8px; align-items: baseline; }
+  #modal .lt-head { padding: 6px 0 5px; border-bottom: 1px solid var(--hair);
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: 1.4px; color: #8f959b; }
+  #modal .lt-head span:not(:first-child) { text-align: right; }
+  #modal .lt-row { padding: 3.5px 0; border-bottom: 1px solid rgba(255,255,255,.045); }
+  #modal .lt-k { color: #9aa1a9; }
+  #modal .lt-v { text-align: right; font-family: var(--mono); font-weight: 700;
+    font-variant-numeric: tabular-nums; letter-spacing: .2px; }
+  #modal .lt-row.lt-hi .lt-k { color: #cfc9b8; }
+  #modal .lt-row.lt-hi .lt-v { font-size: 15px; }
+  #modal .lt-row.lt-sub { opacity: 0.8; }
+  #modal .lt-row.lt-sub .lt-k { padding-left: 13px; font-size: 12.5px; }
+  #modal .lt-row.lt-sub .lt-v { font-weight: normal; font-size: 12.5px; }
+  #modal .lt-p { color: #757c84; }
+  #modal .lt-sec { margin: 14px 0 3px; padding: 5px 0 5px 9px; border-left: 3px solid var(--brass);
+    background: #141a20; font-size: 12px; letter-spacing: .5px; color: #b9b1a0; }
+  #modal .lossNote { max-width: 100%; margin-top: 4px; font-size: 12px; line-height: 1.75; color: #8f959b; }
+  #modal .lossNote b { color: #cfc9b8; }
+  @media (max-width: 560px) {
+    #modal .lt-head, #modal .lt-row { grid-template-columns: 1fr 84px 84px; gap: 6px; }
+    #modal .ov-stats { flex-wrap: wrap; }
+    #modal .ov-stats .os { flex: 1 1 30%; }
+  }
+  #modal .box.wide { max-width: 920px; }
+  /* ---------- 兵力一览 ---------- */
+  #modal .tabs { display: flex; gap: 8px; margin: 10px 0 8px; }
+  #modal .tabs button { padding: 5px 14px; font-size: 12px; }
+  #modal .tabs button.sel { background: #55612e; border-color: #7d9140; }
+  #modal .unitlist { width: 100%; border-collapse: collapse; font-size: 12px; }
+  #modal .unitlist th {
+    text-align: left; font-weight: normal; color: #9aa0a6; white-space: nowrap;
+    padding: 6px 8px; border-bottom: 1px solid var(--edge);
+    position: sticky; top: 0; background: #14181d;
+  }
+  #modal .unitlist td { padding: 5px 8px; white-space: nowrap; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  #modal .unitlist tr.row { cursor: pointer; }
+  #modal .unitlist tr.row:hover { background: rgba(216,183,74,0.1); }
+  #modal .unitlist tr.DE td.nm { color: #b8c4b0; }
+  #modal .unitlist tr.US td.nm { color: #a8c8e8; }
+  #modal .unitlist td.sum { color: var(--gold); font-weight: bold; }
+  #modal .unitlist td.loc { color: #9aa0a6; }
+  #modal .unitlist .down { color: #f0796a; }
+  #modal .unitlist .done { color: #9aa0a6; }
+  #modal .unitlist .nosup { color: #e8907a; }
+  #modal .wrap-scroll { max-height: 62vh; overflow-y: auto; overflow-x: auto; border: 1px solid var(--edge); border-radius: 6px; }
+
+  /* ==================== 手机端适配（2026-10 第二十九轮） ====================
+   * 触发: 视口宽度 ≤ 860px, 或 触屏粗指针 且 宽度 ≤ 1100px(横屏平板)。
+   * 处理四件事:
+   *   1) 顶栏换行 —— 第一行「标题·当前阶段·☰」, 第二行状态组横向滚动, 按钮全部收进下拉菜单;
+   *   2) 面板改贴边 —— 单位面板/战报从左/右上浮窗改为底部卡片, 不再整块压住棋盘;
+   *   3) 点击目标放大 —— 按钮最小 42px 高(指尖可靠命中), 松开菜单/输入等交互面积同步加大;
+   *   4) 棋盘手势 —— 见 render.js: 单指拖动平移、双指捏合缩放、轻点(抖动 ≤14px)才算选中。
+   * 注意: 我没有禁用 user-scalable。画布用 touch-action:none 自己吃掉缩放手势,
+   *       面板里的小字仍允许系统缩放, 保留无障碍能力。
+   * ======================================================================== */
+  @media (max-width: 860px), (pointer: coarse) and (max-width: 1100px) {
+    /* iPhone 等带 Home 指示条的机型: 底部预留安全区, 免得按钮压在系统手势条下面 */
+    :root { --sab: env(safe-area-inset-bottom, 0px); }
+    #topbar { height: auto; flex-wrap: wrap; gap: 8px; row-gap: 6px; padding: 7px 10px; }
+    #topbar .title { font-size: 13px; letter-spacing: 1px; }
+    #topbar .sep { display: none; }
+    #topStats { order: 3; flex: 1 1 100%; gap: 12px; overflow-x: auto; overflow-y: hidden;
+      padding-bottom: 3px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+    #topStats::-webkit-scrollbar { height: 0; }
+    #phaseTag { font-size: 12px; padding: 2px 8px; }
+    #btnMenu { display: inline-flex; align-items: center; justify-content: center;
+      min-width: 42px; min-height: 38px; font-size: 18px; }
+    #topBtns { position: absolute; top: 100%; left: 0; right: 0; z-index: 11; display: none;
+      flex-direction: column; gap: 8px; padding: 10px 10px calc(10px + env(safe-area-inset-bottom));
+      background: rgba(9, 12, 16, 0.97); border-bottom: 1px solid var(--edge);
+      /* 横屏手机可视高度只有 ~390px, 7 个按钮会顶出屏幕: 限高并允许菜单内部滚动 */
+      max-height: 62vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    #topbar.open #topBtns { display: flex; }
+    #topBtns button { width: 100%; min-height: 44px; font-size: 14px; letter-spacing: 1px; }
+    /* 底部卡片式面板: 都抬到相机控制条(bottom:46px, 高 46px)之上, 三者在竖向不打架;
+       单位面板与战报互斥(选中单位时 body.unit-open 隐藏战报), 所以可以共用同一条底边 */
+    #unitPanel { left: 8px; right: 8px; top: auto; bottom: calc(100px + var(--sab)); width: auto;
+      max-height: 44vh; overflow-y: auto; }
+    #logPanel { left: 8px; right: 8px; top: auto; bottom: calc(100px + var(--sab)); width: auto; max-height: 30vh; }
+    #logPanel.collapsed { bottom: calc(100px + var(--sab)); }
+    body.unit-open #logPanel { display: none; }
+    #logList { font-size: 12.5px; line-height: 1.6; }
+    #hintbar { height: calc(36px + var(--sab)); padding: 0 10px; padding-bottom: var(--sab); gap: 10px;
+      font-size: 11px; overflow-x: auto; white-space: nowrap; }
+    #hintbar #legend { gap: 6px; font-size: 10.5px; }
+    .hint-kb { display: none; }
+    .hint-touch { display: inline; }
+    /* 战力比弹窗: 从「居中 380px 宽」改为「贴底通栏」, 免得两列损失拆分被挤出屏幕 */
+    /* 战力比弹窗: 从「居中 380px 宽」改为「贴底通栏」, 免得两列战损拆分被挤出屏幕;
+       它在 z-index 上高于底部面板(15 > 10), 弹出时暂压住战报/单位面板, 按钮落在拇指区 */
+    #oddsPopup { left: 8px; right: 8px; bottom: calc(52px + var(--sab)); transform: none; min-width: 0;
+      padding: 11px 12px; }
+    #oddsPopup .odds-big { font-size: 20px; }
+    #oddsPopup .loss-wrap { flex-wrap: wrap; }
+    #oddsPopup .loss { min-width: 104px; }
+    #oddsPopup .btns button { flex: 1; min-height: 44px; font-size: 14px; }
+    #tooltip { max-width: 62vw; font-size: 12px; }
+    #camCtl { left: 8px; bottom: calc(46px + var(--sab)); }
+    #camCtl button { width: 46px; height: 46px; font-size: 19px; }
+    #banner .big { font-size: 28px; letter-spacing: 4px; }
+    #banner .sub { font-size: 13px; letter-spacing: 2px; }
+    #modal .box { width: 95%; max-height: 88vh; padding: 18px 16px; }
+    #modal .tabs button { padding: 7px 12px; font-size: 12px; }
+  }
+/* ========== 成就与战绩（第三十二轮）==========
+     风格：像素点阵图标 + 制图/黄铜 token，与算子面、图例同一套视觉语言；
+     图标一律 canvas 逐像素绘制（image-rendering: pixelated），零外部图片。 */
+  #achvToast { position: absolute; top: 66px; right: 16px; z-index: 45; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+  .ach-card {
+    pointer-events: auto; display: flex; gap: 12px; align-items: flex-start; width: 320px;
+    background: linear-gradient(180deg, #191d22, #12161a); border: 1px solid var(--rule);
+    border-left: 3px solid var(--brass); border-radius: 3px; padding: 12px 14px;
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5); opacity: 0; transform: translateX(24px);
+    transition: opacity 0.28s ease, transform 0.28s ease;
+  }
+  .ach-card.in { opacity: 1; transform: translateX(0); }
+  .ach-card.gold { border-left-color: #e6c85c; box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(230, 200, 92, 0.18); }
+  .ach-card canvas { width: 48px; height: 48px; image-rendering: pixelated; flex: none; }
+  .ach-card .ac-name { font-family: var(--disp); font-size: 16px; letter-spacing: 1px; color: #f0ead6; }
+  .ach-card .ac-en { font-family: var(--mono); font-size: 9px; letter-spacing: 1.4px; color: var(--brass); }
+  .ach-card .ac-tier { font-family: var(--mono); font-size: 9px; letter-spacing: 1.2px; padding: 1px 5px; border: 1px solid currentColor; border-radius: 2px; }
+  .ach-card .ac-tier.gold { color: #e6c85c; } .ach-card .ac-tier.silver { color: #c8ccd2; } .ach-card .ac-tier.bronze { color: #b08d57; }
+  .ach-card .ac-quote { font-size: 11.5px; line-height: 1.55; color: #b9bdb4; margin-top: 6px; }
+  .ach-card .ac-kicker { font-family: var(--mono); font-size: 9px; letter-spacing: 2px; color: #78808a; margin-bottom: 3px; }
+
+  .ach-box { max-width: 840px !important; }
+  .ach-head { display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--hair); padding-bottom: 10px; flex-wrap: wrap; }
+  .ach-head h1 { margin: 0; }
+  .ach-prog { font-family: var(--mono); font-size: 11px; color: #8f968f; margin-left: auto; text-align: right; line-height: 1.7; }
+  .ach-tabs { display: flex; gap: 6px; margin: 12px 0; flex-wrap: wrap; }
+  .ach-tabs button {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 1.2px; padding: 6px 12px; cursor: pointer;
+    background: #1a1f25; color: #b9bdb4; border: 1px solid var(--hair); border-radius: 2px;
+  }
+  .ach-tabs button.on { color: #12161a; background: var(--brass); border-color: var(--brass); font-weight: 700; }
+  .ach-wall { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+  .ach-tile {
+    position: relative; background: #15191e; border: 1px solid var(--hair); border-radius: 3px;
+    padding: 8px 6px 7px; text-align: center; cursor: pointer; transition: border-color 0.15s, transform 0.15s;
+  }
+  .ach-tile:hover { transform: translateY(-1px); border-color: var(--rule); }
+  .ach-tile:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  .ach-tabs button:focus-visible, .ach-filter button:focus-visible, .ach-foot button:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+  .ach-tile canvas { width: 40px; height: 40px; image-rendering: pixelated; display: block; margin: 0 auto 5px; }
+  .ach-tile .at-n { font-family: var(--disp); font-size: 11px; color: #ddd8c8; letter-spacing: 0.5px; line-height: 1.3; }
+  .ach-tile .at-e { font-family: var(--mono); font-size: 8px; color: #6f766f; letter-spacing: 0.8px; }
+  .ach-tile.locked .at-n, .ach-tile.locked .at-e { color: #5c625c; }
+  .ach-tile.gold { border-color: rgba(230, 200, 92, 0.42); }
+  .ach-tile.silver { border-color: rgba(200, 204, 210, 0.28); }
+  .ach-tile.bronze { border-color: rgba(176, 141, 87, 0.28); }
+  .ach-tile .at-t { position: absolute; top: 4px; right: 5px; font-family: var(--mono); font-size: 8px; letter-spacing: 1px; color: #6f766f; }
+
+  .ach-detail { border: 1px solid var(--hair); border-radius: 3px; padding: 14px; margin-top: 14px; background: #15191e; }
+  .ach-detail .ad-top { display: flex; gap: 14px; align-items: flex-start; }
+  .ach-detail canvas { width: 64px; height: 64px; image-rendering: pixelated; flex: none; }
+  .ach-detail .ad-desc { font-size: 12px; color: #cfd3c8; margin-top: 6px; }
+  .ach-detail .ad-hint { font-size: 11.5px; color: #8f968f; margin-top: 4px; }
+  .ach-detail .ad-quote { font-size: 12.5px; color: #e2ddc9; border-left: 2px solid var(--brass); padding-left: 10px; margin-top: 10px; line-height: 1.6; }
+
+  .ach-rec { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 11px; }
+  .ach-rec th, .ach-rec td { padding: 6px 8px; border-bottom: 1px solid var(--hair); text-align: left; white-space: nowrap; }
+  .ach-rec th { color: #8f968f; font-weight: 400; letter-spacing: 1px; position: sticky; top: 0; background: #14181d; }
+  .ach-rec td.w { color: #a8c8e8; } .ach-rec td.l { color: #e8907a; }
+  .ach-rec-wrap { max-height: 46vh; overflow: auto; border: 1px solid var(--hair); border-radius: 3px; }
+  .ach-filter { display: flex; gap: 6px; align-items: center; margin-bottom: 10px; font-size: 11px; color: #8f968f; flex-wrap: wrap; }
+  .ach-filter button { font-family: var(--mono); font-size: 10.5px; padding: 4px 9px; background: #1a1f25; color: #b9bdb4; border: 1px solid var(--hair); border-radius: 2px; cursor: pointer; }
+  .ach-filter button.on { color: #12161a; background: var(--brass); border-color: var(--brass); }
+  .ach-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .ach-stat { border: 1px solid var(--hair); border-radius: 3px; padding: 10px 12px; background: #15191e; }
+  .ach-stat .as-k { font-family: var(--mono); font-size: 10px; letter-spacing: 1.2px; color: #8f968f; }
+  .ach-stat .as-v { font-family: var(--mono); font-size: 20px; color: #e8e4d8; margin-top: 4px; }
+  .ach-stat .as-s { font-size: 10.5px; color: #7d847d; margin-top: 2px; }
+  .ach-empty { color: #78808a; font-size: 12px; padding: 20px; text-align: center; border: 1px dashed var(--hair); border-radius: 3px; }
+  .ach-foot { display: flex; gap: 8px; align-items: center; margin-top: 14px; flex-wrap: wrap; }
+  .ach-foot button { font-family: var(--mono); font-size: 11px; letter-spacing: 1px; padding: 8px 14px; background: #1a1f25; color: #cfc9b8; border: 1px solid var(--hair); border-radius: 2px; cursor: pointer; }
+  .ach-foot button.primary { background: var(--brass); color: #12161a; border-color: var(--brass); font-weight: 700; }
+  .ach-new { border: 1px solid var(--rule); border-radius: 3px; padding: 12px 14px; margin-top: 14px; background: #15191e; }
+  .ach-new .an-k { font-family: var(--mono); font-size: 10px; letter-spacing: 2px; color: var(--brass); margin-bottom: 8px; }
+  .ach-new .an-row { display: flex; gap: 10px; align-items: center; margin-top: 8px; }
+  .ach-new canvas { width: 36px; height: 36px; image-rendering: pixelated; flex: none; }
+  .ach-new .an-n { font-family: var(--disp); font-size: 13px; color: #e8e4d8; }
+  .ach-new .an-q { font-size: 11px; color: #9aa09a; margin-top: 2px; line-height: 1.5; }
+  @media (max-width: 860px) {
+    #achvToast { top: 96px; right: 8px; left: 8px; }
+    .ach-card { width: auto; }
+    .ach-wall { grid-template-columns: repeat(3, 1fr); }
+    .ach-stats { grid-template-columns: 1fr 1fr; }
+    .ach-box { padding: 18px 14px !important; }
+  }
+  /* 无障碍：尊重"减少动效"——解锁卡不再滑入，直接出现（信息不丢，只是不动） */
+  @media (prefers-reduced-motion: reduce) {
+    .ach-card { transition: none; opacity: 1; transform: none; }
+    .ach-tile { transition: none; }
+  }
+  
+    /* —— 24x 排布优化覆盖（自适应等高瓷砖 / 胶囊分类 / 三色进度条）—— */
+    .ach-box { max-width: 980px !important; max-height: 86vh; overflow: auto; }
+    .ach-head { border-bottom: 1px solid var(--hair); padding-bottom: 12px; margin-bottom: 4px; }
+    .ach-head h1 { letter-spacing: 2px; }
+    .ach-prog { font-family: var(--mono); font-size: 11px; color: #9aa39a; margin-left: auto; text-align: right; line-height: 1.6; }
+    .ach-bar { display: flex; height: 7px; width: 220px; margin: 6px 0 0 auto; border-radius: 4px; overflow: hidden; background: #1a1f24; border: 1px solid var(--hair); }
+    .ach-bar i { display: block; height: 100%; }
+    .ach-bar .b-bronze { background: #b08d57; }
+    .ach-bar .b-silver { background: #c8ccd2; }
+    .ach-bar .b-gold { background: #e6c85c; }
+    .ach-tabs { border-bottom: 1px solid var(--hair); padding-bottom: 8px; margin: 10px 0 10px; }
+    .ach-tabs button {
+      border: 1px solid var(--hair); background: transparent; color: #9aa39a;
+      padding: 5px 14px; border-radius: 14px; cursor: pointer;
+      font-family: var(--mono); font-size: 11px; letter-spacing: 1px;
+    }
+    .ach-tabs button.on { color: #12161a; background: var(--brass); border-color: var(--brass); font-weight: 700; }
+    .ach-filter { margin: 10px 0 12px; gap: 6px; flex-wrap: wrap; }
+    .ach-filter button {
+      border: 1px solid var(--hair); background: transparent; color: #8f968f;
+      padding: 3px 12px; border-radius: 12px; cursor: pointer; font-size: 11px;
+    }
+    .ach-filter button.on { color: #e6c85c; border-color: #8a7a4a; background: rgba(230, 200, 92, 0.08); }
+    .ach-wall { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 12px; }
+    .ach-tile {
+      display: flex; flex-direction: column; align-items: center; text-align: center;
+      padding: 12px 8px 10px; border: 1px solid var(--hair); border-radius: 5px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.12));
+      cursor: pointer; position: relative; min-height: 128px;
+    }
+    .ach-tile .at-ic { height: 46px; display: flex; align-items: center; justify-content: center; margin-bottom: 7px; }
+    .ach-tile .at-n {
+      font-family: var(--disp); font-size: 11.5px; color: #ddd8c8; line-height: 1.3;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .ach-tile .at-e { margin-top: 3px; }
+    .ach-tile.gold { background: linear-gradient(180deg, rgba(230, 200, 92, 0.07), rgba(0, 0, 0, 0.14)); }
+    .ach-tile.locked { opacity: 0.62; }
+    .ach-tile.locked .at-ic { filter: grayscale(1) brightness(0.7); }
+    .ach-tile:hover { transform: translateY(-2px); border-color: var(--rule); }
+    .ach-new { border: 1px solid #8a7a4a; border-radius: 4px; padding: 12px; margin: 12px 0; background: rgba(230, 200, 92, 0.05); }
+    .ach-empty { padding: 30px 10px; text-align: center; color: #8f968f; font-size: 12px; }
+    .ach-rec-wrap { max-height: 46vh; overflow: auto; border: 1px solid var(--hair); border-radius: 3px; }
+    @media (max-width: 720px) { .ach-wall { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); } .ach-bar { width: 150px; } }
+
+</style>
+</head>
+<body>
+  <div id="scene"></div>
+
+  <div id="topbar">
+    <span class="title">阿登1944</span>
+    <span class="sep"></span>
+    <span id="phaseTag">-</span>
+    <div id="topStats">
+      <span class="stat"><span class="label">回合</span><b id="tRound">-</b>/<span id="tRounds">-</span></span>
+      <span class="stat"><span class="label">日期</span><b id="tDate">-</b></span>
+      <span class="stat"><span class="label">天气</span><b id="tWeather">-</b></span>
+      <span class="stat" id="fuelStat" title="德军装甲燃料储备"><span class="label">燃料</span>
+        <span id="fuelBar"><span id="fuelFill" style="display:block;width:100%"></span></span>
+        <b id="tFuel">-</b></span>
+      <span class="stat" id="airStat" title="空袭令牌：美军晴天才可用；德军自12/24起晴天1枚，1945-01-01 底板行动×3"><span class="label">空袭</span><b id="tAir">-</b></span>
+      <span class="stat" id="tokenStat" title="本回合可用支援资产: 反=反坦克小组 救=救护所 急=炮火急袭 补=补充兵员 工=野战工事 空=防空火力"><span class="label">支援</span><b id="tTokens">-</b></span>
+      <span class="stat"><span class="label">渡河</span><b id="tExits">0</b></span>
+    </div>
+    <span class="grow"></span>
+    <button id="btnMenu" title="展开/收起菜单" aria-label="菜单">☰</button>
+    <div id="topBtns">
+      <button id="btnEnd" class="primary">结束阶段</button>
+      <button id="btnAIde">德军AI</button>
+      <button id="btnAIus">美军AI</button>
+      <button id="btnOOB" title="查看当前在场的双方部队，按攻击+防御之和由高到低排序；点击一行可在地图上定位">兵力一览</button>
+      <button id="btnDossiers" title="部队档案：全部建制的史实简介（开局在场 + 增援）">部队档案</button>
+      <button id="btnAchv" title="成就与战绩：勋章墙 / 最近 100 场 / 统计（与原版《阿登1944》互通）">战绩</button>
+  <button id="btnRules">规则</button>
+      <button id="btnSfx" title="音效开关（程序化合成，无外部音频文件）">音效 开</button>
+      <button id="btnDosPop" title="增援档案弹卡开关：关=入场只显示横幅提示，全部档案仍可随时点「部队档案」查阅">档案卡 开</button>
+      <button id="btnAISpeed" title="AI 行动速度：标准 / 快速 / 极速（极速跳过移动动画，适合观摩整局；记忆偏好）">AI 快速</button>
+      <button id="btnRestart">重新开始</button>
+    </div>
+  </div>
+
+  <div id="camCtl" title="视角控制">
+    <button id="btnZoomIn" title="放大">＋</button>
+    <button id="btnZoomOut" title="缩小">－</button>
+    <button id="btnFit" title="整图/战线全景">⤢</button>
+  </div>
+
+  <div id="unitPanel">
+    <h3 id="upName">-</h3>
+    <div class="type-tag" id="upType">-</div>
+    <div class="stats">
+      <div class="stat-box"><div class="v" id="upAtk">-</div><div class="k">攻击</div></div>
+      <div class="stat-box"><div class="v" id="upDef">-</div><div class="k">防御</div></div>
+      <div class="stat-box"><div class="v" id="upMov">-</div><div class="k">移动</div></div>
+    </div>
+    <div class="orgwrap">
+      <div id="upOrg" style="font-size:15px;font-weight:bold;margin:4px 0">组织度 10/10</div>
+    </div>
+    <div class="state-line" id="upSupply">-</div>
+    <div class="state-line" id="upAttach" style="color:#d8b74a"></div>
+    <div class="state-line" id="upPassive"></div>
+    <div class="state-line" id="upExtra" style="color:#9aa0a6"></div>
+    <div class="btns" id="upBtns"></div>
+  </div>
+
+  <div id="logPanel">
+    <button id="btnLogToggle" class="head" title="折叠战报（快捷键 L）" aria-expanded="true">
+      <span class="ttl">战 报</span>
+      <span id="logUnread" class="unread" hidden>0</span>
+      <span class="chev">▾</span>
+    </button>
+    <div id="logList"></div>
+  </div>
+
+  <div id="hintbar">
+    <span class="hint-kb"><b>左键</b> 选择/移动/攻击 · <b>拖动</b> 平移 · <b>滚轮</b> 缩放 · <b>WASD</b> 平移 · <b>L</b> 折叠战报</span>
+    <span class="hint-touch"><b>轻点</b> 选择/移动/攻击 · <b>单指拖动</b> 平移 · <b>双指捏合</b> 缩放</span>
+    <span id="hintMode"></span>
+    <span style="flex:1"></span>
+    <span id="legend" style="display:flex;gap:8px;align-items:center;font-size:11px">
+      <i style="width:11px;height:11px;background:#d3c58c;display:inline-block"></i>开阔
+      <i style="width:11px;height:11px;background:#b59c5e;display:inline-block"></i>丘陵
+      <i style="width:11px;height:11px;background:#557a45;display:inline-block"></i>森林
+      <i style="width:11px;height:11px;background:#9c9084;display:inline-block"></i>山地
+      <i style="width:11px;height:11px;background:#6d8f7c;display:inline-block"></i>沼泽
+      <i style="width:11px;height:11px;background:#3f7bb0;display:inline-block"></i>河流
+      <i style="width:11px;height:11px;background:#c9b489;display:inline-block"></i>公路
+    </span>
+  </div>
+
+  <div id="tooltip"></div>
+  <div id="oddsPopup"></div>
+  <div id="banner"><div class="big" id="bannerBig"></div><div class="sub" id="bannerSub"></div></div>
+  <div id="achvToast"></div>
+<div id="modal"><div class="box" id="modalBox"></div></div>
+  <!-- 启动状态/失败提示(原版35轮移植): 3D 引擎没就绪时让玩家看见发生了什么并能重试 -->
+  <div id="bootStatus" hidden>
+    <div class="bs-box">
+      <div class="bs-kicker">BOOT · 启动状态</div>
+      <div class="bs-msg" id="bsMsg">正在加载 3D 引擎…</div>
+      <div class="bs-hint" id="bsHint"></div>
+      <div class="bs-foot">
+        <button id="bsRetry">重 试</button>
+        <button id="bsReload">刷 新</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3D 引擎加载(原版35/36轮移植): 本地 vendor/three.min.js 经典脚本优先(file:// 双击可用),
+       缺失时回退 3 条 CDN; 失败由 #bootStatus 明说并可重试。单文件版由 build.js 把
+       本标签替换为 gzip+base64 内联 + DecompressionStream 解压(断网可玩)。 -->
+  <script src="vendor/three.min.js"></script>
+  <script>
+    (function () {
+      if (window.THREE) { window.__threeHow = '本地 vendor/three.min.js'; window.dispatchEvent(new Event('three-ready')); return; }
+      /* 单文件版(build.js): #threeGz 数据块在,内联 loader 负责解压与回退,本段立即退出。
+         否则会在异步解压完成前误判"THREE 不存在"抢先走 CDN,数秒后派发 three-failed,
+         把已经成功的启动状态覆盖成失败遮罩(2026-10-25 冒烟发现)。 */
+      if (document.getElementById('threeGz')) return;
+      const CDN_LIST = [
+        'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js',
+        'https://registry.npmmirror.com/three/0.160.0/files/build/three.module.min.js',
+        'https://lib.baomitu.com/three.js/0.160.0/three.module.min.js',
+      ];
+      const bootMsg = (msg, isError, hint) => {
+        const el = document.getElementById('bootStatus'); if (!el) return;
+        el.hidden = !msg; if (!msg) return;
+        el.classList.toggle('error', !!isError);
+        const m = document.getElementById('bsMsg'), h = document.getElementById('bsHint');
+        if (m) m.innerHTML = (isError ? '' : '<span class="spinner"></span>') + msg;
+        if (h) h.textContent = hint || '';
+      };
+      const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
+      (async () => {
+        bootMsg('正在加载 3D 引擎…', false, '本地 vendor/three.min.js 不可用，正在尝试备用线路');
+        for (let i = 0; i < CDN_LIST.length; i++) {
+          try {
+            const mod = await withTimeout(import(CDN_LIST[i]), 6000);
+            if (mod && mod.Scene) { window.THREE = mod; window.__threeHow = 'CDN ' + CDN_LIST[i].split('/')[2]; window.dispatchEvent(new Event('three-ready')); return; }
+          } catch (e) { console.warn('[boot] CDN 失败', CDN_LIST[i], e && e.message); }
+        }
+        window.__threeFailed = '本地 vendor/three.min.js 未加载成功，且 ' + CDN_LIST.length + ' 条备用线路都失败';
+        window.dispatchEvent(new Event('three-failed'));
+      })();
+    })();
+  </script>
+<script src="js/hex.js"></script>
+<script src="js/data.js"></script>
+<script src="js/achv_data.js"></script>
+<script src="js/achv.js"></script>
+<script src="js/data_big_oob.js"></script>
+<script src="js/data_big.js"></script>
+<script src="js/dossiers_big_de1.js"></script>
+<script src="js/dossiers_big_de2.js"></script>
+<script src="js/dossiers_big_de3.js"></script>
+<script src="js/dossiers_big_de4.js"></script>
+<script src="js/dossiers_big_de5.js"></script>
+<script src="js/dossiers_big_us1.js"></script>
+<script src="js/dossiers_big_us2.js"></script>
+<script src="js/dossiers_big_us3.js"></script>
+<script src="js/dossiers_big_us4.js"></script>
+<script src="js/dossiers_big_uk.js"></script>
+<script src="js/dossiers_big_uk2.js"></script>
+<script src="js/dossiers_big.js"></script>
+<script src="js/mapgen.js"></script>
+  <script src="js/combat.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/ai.js"></script>
+<script src="js/render.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/intro.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

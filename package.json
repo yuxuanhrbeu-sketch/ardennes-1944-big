@@ -1,0 +1,31 @@
+{
+  "name": "ardennes-1944-big",
+  "version": "1.0.0",
+  "private": true,
+  "description": "《阿登 1944·大推演》—— 营级阿登战役兵棋推演（浏览器单文件，离线可玩）",
+  "keywords": [
+    "wargame",
+    "hex",
+    "three.js",
+    "ardennes",
+    "ww2",
+    "browser-game",
+    "single-file"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/yuxuanhrbeu-sketch/ardennes-1944-big",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yuxuanhrbeu-sketch/ardennes-1944-big.git"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "node build.js",
+    "start": "node tools/serve.js",
+    "check": "node tools/check_big.js && node tools/oob_big/check_oob_big.js",
+    "test": "node tools/check_big.js && node tools/oob_big/check_oob_big.js && node qa/type_buffs_check.js && node qa/dossier_coverage_check.js && node qa/town_supply_flip_check.js && node qa/hq_command_check.js && node qa/achv_check.js && node qa/reinforce_supply_check.js && node qa/scan_fake_names.js && node qa/diag_towns.js && node qa/coverage_area.js && node qa/wilderness_check.js",
+    "credits": "node tools/gen_credits.js"
+  }
+}

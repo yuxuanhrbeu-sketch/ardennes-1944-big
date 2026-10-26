@@ -1,0 +1,20 @@
+# 默认：文本文件按 LF 入库，Windows 检出时转 CRLF 与否交给核心配置
+* text=auto eol=lf
+
+# 明确二进制，避免 git 试图做行尾转换或 diff
+*.jpg  binary
+*.jpeg binary
+*.png  binary
+*.webp binary
+*.gif  binary
+*.ico  binary
+*.woff binary
+*.woff2 binary
+*.ttf  binary
+
+# 生成物 / 内联引擎：不参与 GitHub 语言统计与 diff
+js/data_big_oob.js        linguist-generated=true
+vendor/three.min.js       linguist-vendored=true
+vendor/three.module.min.js linguist-vendored=true
+vendor/classic/*          linguist-vendored=true
+js/dossiers_big_*.js      linguist-generated=true
