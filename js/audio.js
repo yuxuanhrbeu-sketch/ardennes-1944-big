@@ -26,8 +26,8 @@
 globalThis.SFX = (function () {
 
   const KEY = 'ardennes44_sfx';
-  const MASTER_VOL = 0.28;
-  const MAX_VOICES = 8;
+  const MASTER_VOL = 0.42;
+  const MAX_VOICES = 12;
 
   let ctx = null, master = null, comp = null, ready = false;
   // 静音偏好：模块加载即从 localStorage 读取，使顶栏开关在 init() 之前也能显示正确状态
@@ -48,23 +48,58 @@ globalThis.SFX = (function () {
 
   function init() {
     if (ready) { resume(); return true; }
+    const _dbg = [];
     try {
       const AC = globalThis.AudioContext || globalThis.webkitAudioContext;
-      if (!AC) return false;
+      if (!AC) { console.error('[SFX] no AudioContext'); return false; }
+      _dbg.push('AC ok');
       ctx = new AC();
+      _dbg.push('ctx ok state=' + ctx.state);
       comp = ctx.createDynamicsCompressor();
-      comp.threshold.value = -18; comp.knee.value = 24; comp.ratio.value = 6;
-      comp.attack.value = 0.004; comp.release.value = 0.25;
+      _dbg.push('comp ok');
+      comp.threshold.value = -16; comp.knee.value = 18; comp.ratio.value = 4;
+      comp.attack.value = 0.003; comp.release.value = 0.18;
+      _dbg.push('comp-set ok');
       master = ctx.createGain();
+      _dbg.push('master ok');
       master.gain.value = MASTER_VOL;
-      comp.connect(master); master.connect(ctx.destination);
+      _dbg.push('master-vol ok');
+      /* 27k 混响链: 干声直达 + 湿声经卷积混响——所有音效自动获得战场空间感 */
+      comp.connect(master);
+      try {
+        const irLen = Math.floor(ctx.sampleRate * 1.2);
+        const irBuf = ctx.createBuffer(2, irLen, ctx.sampleRate);
+        for (let ch = 0; ch < 2; ch++) {
+          const d = irBuf.getChannelData(ch);
+          for (let i = 0; i < irLen; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / irLen, 2.6);
+        }
+        const conv = ctx.createConvolver();
+        conv.buffer = irBuf;
+        const send = ctx.createGain(); send.gain.value = 0.32;
+        const wet = ctx.createGain(); wet.gain.value = 0.6;
+        comp.connect(send); send.connect(conv); conv.connect(wet); wet.connect(master);
+      } catch (e) { /* 混响失败不影响干声 */ }
+      master.connect(ctx.destination);
       muted = globalThis.localStorage && globalThis.localStorage.getItem(KEY) === 'off';
       ready = true;
       resume();
+      _dbg.push('ready=true');
+      if (typeof console !== 'undefined') console.log('[SFX.init]', _dbg.join(' → '));
       return true;
-    } catch (e) { ready = false; return false; }
+    } catch (e) {
+      if (typeof console !== 'undefined') console.error('[SFX.init] THROW at', _dbg.join(' → '), e.message);
+      ready = false; return false;
+    }
   }
-  function resume() { try { if (ctx && ctx.state === 'suspended') ctx.resume(); } catch (e) { /* 忽略 */ } }
+  function resume() {
+    try {
+      if (ctx && ctx.state === 'suspended') { ctx.resume(); }
+    } catch (e) { /* 忽略 */ }
+  }
+  /* 27k2: 每次用户交互都确保 context 处于 running——浏览器可能在任意时刻挂起 context */
+  function ensureRunning() {
+    try { if (ctx && ctx.state === 'suspended') ctx.resume(); } catch (e) { /* 忽略 */ }
+  }
   function isMuted() { return muted; }
   function setMuted(m) {
     muted = !!m;
@@ -161,24 +196,36 @@ globalThis.SFX = (function () {
     attack(o) {
       const k = (o && o.kind) || 'small';
       if (k === 'tank') {
-        tone({ type: 'square', f0: 120, f1: 42, dur: 0.22, gain: 0.3, attack: 0.002 });
-        noiseHit({ dur: 0.55, type: 'lowpass', freq: 900, sweepTo: 160, gain: 0.34, attack: 0.004 });
+        // 坦克炮: 方波低频（有泛音听得见）+ 高频碎裂 + 金属余振
+        tone({ type: 'square', f0: 120, f1: 36, dur: 0.25, gain: 0.38, attack: 0.001 });
+        noiseHit({ dur: 0.5, type: 'lowpass', freq: 1100, sweepTo: 130, gain: 0.42, attack: 0.002 });
+        noiseHit({ dur: 0.14, type: 'highpass', freq: 3200, gain: 0.2, attack: 0.001 });
+        tone({ t: now() + 0.12, type: 'triangle', f0: 880, f1: 420, dur: 0.3, gain: 0.08 });
       } else if (k === 'mixed') {
-        tone({ type: 'square', f0: 130, f1: 46, dur: 0.2, gain: 0.22, attack: 0.002 });
-        burst({ n: 5, gap: 0.06, freq: 1500, dur: 0.045, gain: 0.3, thump: 90 });
-        noiseHit({ dur: 0.45, type: 'lowpass', freq: 800, sweepTo: 150, gain: 0.2 });
+        tone({ type: 'sawtooth', f0: 110, f1: 30, dur: 0.22, gain: 0.3, attack: 0.001 });
+        burst({ n: 7, gap: 0.05, freq: 1600, dur: 0.04, gain: 0.36, thump: 72 });
+        noiseHit({ dur: 0.42, type: 'lowpass', freq: 950, sweepTo: 130, gain: 0.28, attack: 0.002 });
+        noiseHit({ dur: 0.1, type: 'highpass', freq: 2800, gain: 0.14, attack: 0.001 });
       } else {
-        burst({ n: 6, gap: 0.055, freq: 1700, dur: 0.042, gain: 0.34, thump: 110, ramp: true });
+        // 步兵: 密集点射 + 低频脉冲
+        burst({ n: 8, gap: 0.045, freq: 1900, dur: 0.036, gain: 0.38, thump: 95, ramp: true });
+        noiseHit({ dur: 0.2, type: 'lowpass', freq: 500, gain: 0.14, attack: 0.01 });
       }
-      return 0.6;
+      return 0.7;
     },
     // 炮击（远程）：出膛 → 0.35s 后远处爆炸回响
     arty() {
       const t = now();
-      tone({ t, type: 'sine', f0: 92, f1: 34, dur: 0.3, gain: 0.3, attack: 0.004 });
-      noiseHit({ t, dur: 0.4, type: 'lowpass', freq: 420, sweepTo: 120, gain: 0.26 });
-      noiseHit({ t: t + 0.35, dur: 0.8, type: 'lowpass', freq: 260, sweepTo: 90, gain: 0.2, attack: 0.02 });
-      return 1.2;
+      // 出膛
+      tone({ t, type: 'square', f0: 85, f1: 28, dur: 0.3, gain: 0.38, attack: 0.002 });
+      noiseHit({ t, dur: 0.35, type: 'lowpass', freq: 500, sweepTo: 100, gain: 0.3, attack: 0.002 });
+      // 弹道哨声（频率下扫）
+      tone({ t: t + 0.12, type: 'sine', f0: 1600, f1: 380, dur: 0.55, gain: 0.06, attack: 0.08 });
+      // 远处爆炸（双波次）
+      noiseHit({ t: t + 0.42, dur: 0.7, type: 'lowpass', freq: 380, sweepTo: 80, gain: 0.3, attack: 0.003 });
+      tone({ t: t + 0.42, type: 'triangle', f0: 68, f1: 22, dur: 0.7, gain: 0.24 });
+      noiseHit({ t: t + 0.62, dur: 0.9, type: 'lowpass', freq: 220, sweepTo: 70, gain: 0.18, attack: 0.03 });
+      return 1.6;
     },
     // 空袭：活塞机掠过 + 落弹
     air() {
@@ -201,24 +248,29 @@ globalThis.SFX = (function () {
     result(o) {
       const r = o && o.result;
       const t = now();
-      if (r === 'DE' || r === 'AE') {                    // 被击破/被击溃：爆炸 + 下坠
-        noiseHit({ t, dur: 0.6, type: 'lowpass', freq: 800, sweepTo: 130, gain: 0.36 });
-        tone({ t, type: 'sawtooth', f0: 220, f1: 60, dur: 0.5, gain: 0.16 });
-      } else if (r === 'DR' || r === 'AR') {             // 撤退：短促下行动机
-        tone({ t, type: 'triangle', f0: 420, f1: 170, dur: 0.28, gain: 0.16 });
-      } else if (r === 'EX') {                           // 互有损伤：两声对撞
-        noiseHit({ t, dur: 0.3, type: 'lowpass', freq: 600, sweepTo: 180, gain: 0.26 });
-        noiseHit({ t: t + 0.12, dur: 0.3, type: 'lowpass', freq: 520, sweepTo: 160, gain: 0.2 });
+      if (r === 'DE' || r === 'AE') {                    // 被击破/被击溃：三层爆炸（低频闷响 + 中频碎裂 + 高频碎片）
+        tone({ t, type: 'square', f0: 110, f1: 28, dur: 0.4, gain: 0.36, attack: 0.001 });
+        noiseHit({ t, dur: 0.5, type: 'lowpass', freq: 1000, sweepTo: 120, gain: 0.42, attack: 0.001 });
+        noiseHit({ t: t + 0.04, dur: 0.12, type: 'highpass', freq: 3600, gain: 0.18, attack: 0.001 });
+        tone({ t: t + 0.15, type: 'triangle', f0: 700, f1: 180, dur: 0.4, gain: 0.1 });
+      } else if (r === 'DR' || r === 'AR') {             // 撤退：引擎急退声
+        tone({ type: 'sawtooth', f0: 180, f1: 340, dur: 0.18, gain: 0.14, attack: 0.01 });
+        tone({ t: now() + 0.14, type: 'triangle', f0: 380, f1: 140, dur: 0.22, gain: 0.12 });
+      } else if (r === 'EX') {                           // 互有损伤：双声对撞
+        tone({ type: 'square', f0: 85, f1: 32, dur: 0.18, gain: 0.26, attack: 0.002 });
+        noiseHit({ t, dur: 0.25, type: 'lowpass', freq: 700, sweepTo: 160, gain: 0.3 });
+        noiseHit({ t: t + 0.1, dur: 0.25, type: 'lowpass', freq: 550, sweepTo: 140, gain: 0.2 });
       }
       return 0.7;
     },
     // 建制被歼
     elim() {
       const t = now();
-      tone({ t, type: 'square', f0: 110, f1: 34, dur: 0.32, gain: 0.26, attack: 0.003 });
-      noiseHit({ t, dur: 0.9, type: 'lowpass', freq: 700, sweepTo: 110, gain: 0.32, attack: 0.006 });
-      tone({ t: t + 0.18, type: 'triangle', f0: 300, f1: 80, dur: 0.6, gain: 0.12 });
-      return 1.2;
+      tone({ t, type: 'sawtooth', f0: 95, f1: 22, dur: 0.35, gain: 0.34, attack: 0.002 });
+      noiseHit({ t, dur: 1.1, type: 'lowpass', freq: 900, sweepTo: 80, gain: 0.36, attack: 0.003 });
+      noiseHit({ t: t + 0.08, dur: 0.3, type: 'bandpass', freq: 2400, q: 3, gain: 0.14, attack: 0.001 });
+      tone({ t: t + 0.2, type: 'triangle', f0: 280, f1: 60, dur: 0.8, gain: 0.14 });
+      return 1.6;
     },
     // 城镇/油库易手：钟声（三部分音 + 长衰减）
     capture() {
@@ -320,6 +372,7 @@ globalThis.SFX = (function () {
   /* ---------------- 对外接口 ---------------- */
   function play(name, opts) {
     if (!ready || muted) return false;
+    ensureRunning();   // 27k2: 每次播放前确保 context 未挂起
     const fn = S[name];
     if (!fn) return false;
     const gap = GAP[name] || 60;

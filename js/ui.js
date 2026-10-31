@@ -191,7 +191,7 @@ globalThis.UI = (function () {
         b.disabled = !chk.ok;
         b.title = (engr ? '工兵请改用下方「就地筑垒」（格上工事, 每' + (DATA.TRAIT_KNOBS || {}).ENGR_ENTRENCH_CD + '回合一次）\n' : '') +
           (chk.ok ? DATA.BUFFS[id].desc : chk.why);
-        b.onclick = () => { SFX.play('click'); game.grantBuff(id, u); refreshUnitPanel(); };
+        b.onclick = () => { SFX.play('click'); markUndo(); game.grantBuff(id, u); refreshUnitPanel(); };
         btns.appendChild(b);
       }
     }
@@ -335,13 +335,33 @@ globalThis.UI = (function () {
     refreshUnitPanel(); refreshHint();
   }
 
+  /* 27m: 炮击可用性统一判定(红标显示与点击开火共用同一判定源, 与引擎 artyFire 逐条对齐):
+     ART 0-4(雾-1, 贴脸可直射·26x); RKT 2-4 盲区 + 被贴脸禁射(原规则, 面压制不受雾影响)。 */
+  function canBombard(a, t) {
+    if (!a || !t || !a.alive || a.exited || a.fired || a.moved) return false;
+    if (a.type !== 'ART' && a.type !== 'RKT') return false;
+    if (a.type === 'RKT' && game.inZOC(a.c, a.r, a.side)) return false;
+    const rng = a.type === 'RKT' ? DATA.TRAIT_KNOBS.RKT_RANGE
+      : a.range - (game.state.weather === 'fog' ? 1 : 0);
+    const minR = a.type === 'RKT' ? DATA.TRAIT_KNOBS.RKT_MIN_RANGE : 0;
+    const d = Hex.distance(a.c, a.r, t.c, t.r);
+    return d >= minR && d <= rng;
+  }
+
+  /* 27m: 红标=所选单位【本回合自身】攻击范围内的敌军(旧版标"任意友军可达", 与所选单位
+     无关, 误导玩家)。地面=相邻可突击(!attacked, 攻击与移动独立故不看 moved);
+     炮兵=射程内(canBombard)。已攻击/已开火/已机动炮兵不显示。
+     红标是 overlay Mesh, 不在算子/地形拾取路径(27l 结构性免疫), 点击红格仍
+     unit-first 命中敌算子 → 走攻击面板/炮击。 */
   function highlightAttackTargets() {
     if (!selected || selected.side !== game.state.phase) return;
-    // 可攻击目标 = 与任一可用攻击方相邻的敌军
+    const arty = selected.type === 'ART' || selected.type === 'RKT';
+    if (arty) { if (selected.fired || selected.moved) return; }
+    else if (selected.attacked || selected.org <= 0) return;
     for (const e of game.units) {
-      if (!e.alive || e.side === game.state.phase) continue;
-      const atts = game.attackersFor(e);   // 原版38轮移植: 旧 filter 恒真等于不过滤
-      if (atts.length) renderer._hexMark(e.c, e.r, 0xff5544, 0.35, 0.15);
+      if (!e.alive || e.exited || e.side === selected.side) continue;
+      if (arty) { if (canBombard(selected, e)) renderer._hexMark(e.c, e.r, 0xff5544, 0.35, 0.15); }
+      else if (Hex.distance(selected.c, selected.r, e.c, e.r) === 1) renderer._hexMark(e.c, e.r, 0xff5544, 0.35, 0.15);
     }
   }
 
@@ -358,8 +378,15 @@ globalThis.UI = (function () {
   }
 
   /* ---------------- 点击处理 ---------------- */
-  function onHexClick(c, r) {
+  function onHexClick(c, r, tC, tR) {
+    if (paused) { showBanner('推演暂停中', '点顶栏「继续」恢复', 1500); return; }
     if (aiBusy || !game || game.state.over) return;
+    /* 26z: 双拾取回退——c/r=算子优先格(可能被选中单位自己的碰撞盒截胡成自身格),
+       tC/tR=纯地形格。除移动分支外, 算子格缺失时用地形格兜底。 */
+    if (c === null || c === undefined) {
+      if (tC === null || tC === undefined) return;
+      c = tC; r = tR;
+    }
     const u = game.unitAt(c, r);
     // 已有城市补给覆盖展示时：先关掉，避免与后续选择叠加
     if (townCov) {
@@ -375,22 +402,39 @@ globalThis.UI = (function () {
       if (u && u.side !== selected.side) {
         const atts = game.attackersFor(u);
         if (atts.length) { openAttackPanel(u, atts); return; }
-      }
-      // 移动?
-      if (!u && reach && reach.dist.has(Hex.key(c, r))) {
-        const path = game.pathFromReach(reach, Hex.key(c, r));
-        if (path && path.length) {
-          const unit = selected;
-          game.doMove(unit, path);
-          // 选中状态保留(可继续攻击), 刷新可达域
-          reach = unit.moved ? null : game.getReach(unit);
-          renderer.clearSelection();
-          renderer.selectHexRing(unit.c, unit.r);
-          if (reach) renderer.showMoveRange(reach);
-          highlightAttackTargets();
-          refreshUnitPanel();
+        /* 27m: 炮兵选中态点击射程内敌军 → 直接炮击(与炮击模式同款行为, 无需先切模式;
+           判定与红标共用 canBombard, 引擎 artyFire 仍兜底复核) */
+        if (canBombard(selected, u)) {
+          markUndo();
+          game.artyFire(selected, u);
+          setMode('selected');
+          refreshTop();
+          return;
         }
-        return;
+      }
+      // 移动?（含 26z: 点到自家选中单位盒盖住的相邻格——用纯地形格重试）
+      if (reach && (!u || u === selected)) {
+        /* 26z: 拥挤区点相邻格, 射线被选中单位自己的碰撞盒截胡, onHexClick 收到自身格
+           （dist.has 成立但 path 为空, 什么都不发生 = 玩家"一格没反应"）。
+           自家盒盖住邻格(tC/tR ≠ 自身)且邻格可达 → 直接按邻格移动。 */
+        const selfBoxed = u === selected && tC !== null && tC !== undefined && (c !== tC || r !== tR);
+        let k = (selfBoxed && reach.dist.has(Hex.key(tC, tR))) ? Hex.key(tC, tR) : Hex.key(c, r);
+        if (reach.dist.has(k)) {
+          const path = game.pathFromReach(reach, k);
+          if (path && path.length) {
+            const unit = selected;
+            markUndo();
+            game.doMove(unit, path);
+            // 选中状态保留(可继续攻击), 刷新可达域
+            reach = unit.moved ? null : game.getReach(unit);
+            renderer.clearSelection();
+            renderer.selectHexRing(unit.c, unit.r);
+            if (reach) renderer.showMoveRange(reach);
+            highlightAttackTargets();
+            refreshUnitPanel();
+          }
+          return;
+        }
       }
       // 换选/取消
       if (u && u.side === game.state.phase && !u.moved) { selectUnit(u); return; }
@@ -417,13 +461,19 @@ globalThis.UI = (function () {
     const arty = game.artyInRange(defUnit);
     renderOddsPopup(defUnit, attUnits, arty, (ok, chosenArty) => {
       if (!ok) { renderer._clearOverlay(); highlightAttackTargets(); return; }
+      markUndo();
       const res = game.doAttack(attUnits, defUnit, chosenArty);
       if (res && res.advanceOffer) enterAdvanceMode();
-      if (selected && (!selected.alive || selected.moved)) {
-        // 攻击后保持选中(若还活着)以便查看
-        reach = null;
+      else {
+        /* 27m: 攻击结算后统一刷新覆盖层——红标随 attacked/阵亡立即消失(旧版此路径
+           不清 overlay, 打完红标仍挂着), 未移动者保留蓝色可达域。
+           刷新顺序与移动分支一致: clearSelection→ring→range→marks。 */
+        reach = (selected && selected.alive && !selected.moved) ? game.getReach(selected) : null;
+        renderer._clearOverlay();
         renderer.clearSelection();
-        renderer.selectHexRing(selected.c, selected.r);
+        if (selected && selected.alive) renderer.selectHexRing(selected.c, selected.r);
+        if (reach) renderer.showMoveRange(reach);
+        highlightAttackTargets();
         refreshUnitPanel();
       }
     });
@@ -487,6 +537,7 @@ globalThis.UI = (function () {
     if (!t || t.side === selected.side) return;
     let rng = selected.range - (game.state.weather === 'fog' ? 1 : 0);
     if (Hex.distance(selected.c, selected.r, c, r) > rng) { SFX.play('warning'); showBanner('超出射程', '', 900); return; }
+    markUndo();
     game.artyFire(selected, t);
     setMode('selected');
   }
@@ -495,6 +546,7 @@ globalThis.UI = (function () {
     const t = game.unitAt(c, r);
     const side = game.state.phase;
     if (!t || t.side === side) return;
+    markUndo();
     game.airStrike(t, side);
     setMode('idle');
     refreshTop();
@@ -528,11 +580,11 @@ globalThis.UI = (function () {
   }
 
   /* ---------------- 悬浮提示 ---------------- */
-  function onHexHover(c, r) {
+  function onHexHover(c, r, tC, tR) {
     const tip = $('tooltip');
-    if (c === null || aiBusy) { tip.style.display = 'none'; return; }
+    if (c === null || aiBusy) { tip.style.display = 'none'; renderer.clearMarchArrow(); return; }
     const h = game.hexAt(c, r);
-    if (!h) { tip.style.display = 'none'; return; }
+    if (!h) { tip.style.display = 'none'; renderer.clearMarchArrow(); return; }
     const t = DATA.TERRAIN[h.terrain];
     let html = `<b>${t.name}</b> · 移动${t.mv} · 防御×${t.dm}`;
     if (h.road) html += ' · 公路';
@@ -544,15 +596,49 @@ globalThis.UI = (function () {
       if (h.town.supply) html += ` · ${tt}补给点（预算 ${tw ? tw.range : DATA.SUPPLY_R_TOWN}）<br><span style="opacity:.7">点击查看补给覆盖范围</span>`;
     }
     if (h.exit) html += '<br><span style="color:#d8b74a">马斯河突破线</span>';
-    const u = game.unitAt(c, r);
-    if (u) {
-      html += `<br>─────<br>${u.side === 'DE' ? '德军' : '美军'} ${u.name}<br>攻${u.type === 'ART' || u.type === 'RKT' ? u.sup + '(支援)' : u.atk} 防${u.def} 移${u.mov} · 组织度${u.org}/${u.maxOrg}${u.supplied ? '' : ' · <span style="color:#e8907a">断补</span>'}`;
+    const un = game.unitAt(c, r);
+    if (un) {
+      html += `<br>─────<br>${un.side === 'DE' ? '德军' : '美军'} ${un.name}<br>攻${un.type === 'ART' || un.type === 'RKT' ? un.sup + '(支援)' : un.atk} 防${un.def} 移${un.mov} · 组织度${un.org}/${un.maxOrg}${un.supplied ? '' : ' · <span style="color:#e8907a">断补</span>'}`;
     }
     tip.innerHTML = html;
     tip.style.display = 'block';
     tip.style.left = Math.min(window.innerWidth - 280, lastMouse.x + 16) + 'px';
     tip.style.top = (lastMouse.y + 16) + 'px';
+    // —— 25g 行军箭头预览 + 25h MP/攻击预览（地面格 gC/gR 优先, 解决算子盒遮挡导致的解析偏移）——
+    const gC = (tC !== undefined && tC !== null) ? tC : c;
+    const gR = (tC !== undefined && tC !== null) ? tR : r;
+    if (selected && reach && mode === 'selected' && gC !== null && gC !== undefined && !aiBusy) {
+      const k = Hex.key(gC, gR);
+      if (reach.dist.has(k) && !game.unitAt(gC, gR)) {
+        // 25g 修: pathFromReach 不含起点格——补起点, 否则相邻格(最常见的单步移动)箭头永不显示
+        const p = game.pathFromReach(reach, k);
+        if (p && p.length) {
+          const full = [{ c: selected.c, r: selected.r }, ...p];
+          renderer.showMarchArrow(selected, full, reach.dist);
+        } else renderer.clearMarchArrow();
+        // —— 25h MP/攻击预览（tooltip 增强行）——
+        const acc = reach.dist.get(k);
+        let mpLine = `<br><span style="color:#e6c85c">⇢ 行军 ${acc} MP`;
+        if (acc > selected.mov) mpLine += `（超支 ${acc - selected.mov}，约 ${Math.ceil(acc / Math.max(1, selected.mov))} 回合抵达）`;
+        else mpLine += ` · 剩余 ${Math.max(0, selected.mov - acc)} MP`;
+        mpLine += '</span>';
+        const tf = game.unitAt(gC, gR);
+        const foe = Hex.neighbors(gC, gR).map(n => game.unitAt(n.c, n.r)).find(f => f && f.alive && f.side !== selected.side);
+        if (foe) {
+          const atts = game.attackersFor(foe);
+          if (atts.length) {
+            const pv = game.previewAttack(atts, foe, []);
+            if (pv.atk > 0) {
+              mpLine += `<br><b style="color:#f0a090">⚔ 攻击预览 ${pv.key}</b>　攻 ${Math.round(pv.atk * 10) / 10} / 防 ${Math.round(pv.def * 10) / 10}`;
+              if (pv.shifts && pv.shifts.length) mpLine += `（${pv.shifts.map(x => x.name).join('、')}）`;
+            }
+          }
+        }
+        tip.innerHTML += mpLine;
+      } else renderer.clearMarchArrow();
+    } else renderer.clearMarchArrow();
   }
+
   let lastMouse = { x: 0, y: 0 };
   window.addEventListener('mousemove', e => { lastMouse = { x: e.clientX, y: e.clientY }; });
 
@@ -570,19 +656,24 @@ globalThis.UI = (function () {
     g.on('move', d => {
       achvTick();   // 24v: 成就事件
       SFX.play('move', { kind: sfxMoveKind(d.unit) });
-      enqueue(() => new Promise(res => {
-        renderer.animateMove(d.unit, d.fromHex, d.path, () => {
-          renderer.refreshUnit(d.unit);
-          res();
-        });
-        setTimeout(res, 1800); // 兜底
-      }));
+      // 26p: 动画队列积压时(大回合全单位推进)直接落位, 否则画面会落后引擎越来越远、整回合像卡死
+      if (renderer && renderer.isBacklogged && renderer.isBacklogged()) {
+        renderer.refreshUnit(d.unit);
+      } else {
+        enqueue(() => new Promise(res => {
+          renderer.animateMove(d.unit, d.fromHex, d.path, () => {
+            renderer.refreshUnit(d.unit);
+            res();
+          });
+          setTimeout(res, 1800); // 兜底
+        }));
+      }
       refreshTop();
     });
     g.on('combat', d => {
       achvTick();   // 24v: 成就事件
-      sfxCombat(d);
-      enqueue(() => new Promise(res => {
+      if (!bulkFast) sfxCombat(d);
+      if (!bulkFast) enqueue(() => new Promise(res => {
         const du = d.defUnit;
         const hx = renderer.hexAt(du.c, du.r) ? du.c : du.c;
         const w = renderer.hexWorld(du.c, du.r);
@@ -619,6 +710,15 @@ globalThis.UI = (function () {
     g.on('buff', () => SFX.play('buff'));
     g.on('weather', () => { renderer.setWeather(game.state.weather); SFX.play('weather'); });
     g.on('phase', () => {
+      undoSnap = null;   // 25a: 阶段切换作废撤子
+      /* 26z: 人类回合强制恢复表现状态。AI 阶段的看门狗/自愈出口不经过 executeTurn 的
+         完成回调——bulkFast/skipMoveAnim/animScale 残留到人类回合：攻击相邻敌军零反馈
+         （战斗事件被跳过＝玩家反馈"一格没反应"）、移动瞬移无过程（"费一番劲才能移动"、
+         "手机版单位移动不了"）。phase 事件是所有出口的必经点（endPhase→_startPhase→emit）。 */
+      bulkFast = false;
+      if (renderer) { renderer.animScale = 1; renderer.skipMoveAnim = false; }
+      renderer.setHighlightSide(
+        (game.state.phase === 'DE' ? aiDE : aiUS) ? null : game.state.phase);   // 25c: 人类阶段高亮未移动算子
       renderer.syncUnits(game);
       refreshTop();
       SFX.play('phase', { side: game.state.phase });
@@ -628,6 +728,7 @@ globalThis.UI = (function () {
       setTimeout(() => { maybeAI(); }, 600);
     });
     g.on('over', () => { renderer.syncUnits(game); SFX.play('over', { winner: game.state.winner }); achvFinish(); showOverModal(); });
+      renderer.setHighlightSide(null);   // 25c
     g.on('state', () => refreshTop());
   }
 
@@ -760,6 +861,21 @@ globalThis.UI = (function () {
     { key: 'turbo', label: 'AI 极速', anim: 0.35, pace: [20, 30, 40], skipMove: true },
   ];
   let aiSpeed = 1;
+  let bulkFast = false;   // 26y: 大批量阶段——连交火动画也跳过（否则每场 700ms 停顿把阶段拖过看门狗）
+  /* 27k: 文档级一次性 AudioContext 解锁——浏览器自动播放策略要求首次交互后才能创建
+     AudioContext。此前只在开局按钮/战绩按钮里 init, 用户如果先点地图或顶栏其他按钮
+     就会跳过初始化 → 后续所有音效静默失败。 */
+  {
+    const _sfxUnlock = () => { SFX.init(); SFX.resume(); };
+    document.addEventListener('pointerdown', _sfxUnlock, { capture: true });
+    document.addEventListener('pointerup', _sfxUnlock, { capture: true });
+    document.addEventListener('click', _sfxUnlock, { capture: true });
+  }
+  /* 27e: AGGRO 进攻强度档位恢复（AI 指挥面板可调, 持久化 ardennes44_aggro） */
+  try {
+    const ag = localStorage.getItem('ardennes44_aggro');
+    if (ag && typeof AI.setAggroPreset === 'function') AI.setAggroPreset(ag);
+  } catch (e) { /* 隐私模式: 用默认进攻档 */ }
   try {
     const v = localStorage.getItem('ardennes44_aispeed');
     if (v) { const i = AI_SPEEDS.findIndex(s2 => s2.key === v); if (i >= 0) aiSpeed = i; }
@@ -772,7 +888,43 @@ globalThis.UI = (function () {
     b.setAttribute('aria-label', 'AI 行动速度：' + aiSpeedCfg().label + '（点击切换标准/快速/极速）');
   }
 
+  /* —— 25a 撤子/暂停 —— */
+  let undoSnap = null;      // 最近一次玩家操作前快照（serialize JSON）；阶段切换即作废
+  let paused = false;       // 暂停：拦 AI 调度与玩家输入，不影响已完成结算
+  function markUndo() {
+    if (paused || aiBusy || !game || game.state.over) return;
+    try { undoSnap = game.snapshotJson(); } catch (e) { undoSnap = null; }
+  }
+  function doUndo() {
+    if (!undoSnap) { showBanner('没有可撤的操作', '撤子仅在你最近一次行动前留一个档', 1800); return; }
+    if (aiBusy) { showBanner('AI 行动中', 'AI 阶段结束后才能撤子', 1600); return; }
+    if (game.state.over) { showBanner('战役已结束', '终局后不能撤子', 1600); return; }
+    try {
+      game.restoreJson(undoSnap);
+      undoSnap = null;
+      if (game.state.achvTrack) game.state.achvTrack.undoUsed = true;   // 26q: 一言九鼎——用过悔棋就不解锁
+      selected = null; reach = null; mode = 'idle';
+      renderer.clearSelection();
+      renderer.buildWorld(game.map, game);
+      renderer.syncUnits(game);
+      renderer.setWeather(game.state.weather);
+      refreshTop(); refreshUnitPanel();
+      game.log('已撤回上一手（战损、令牌、城镇归属一并回滚；骰运将重新掷取）', 'sys');
+      SFX.play('page');
+    } catch (e) {
+      showBanner('撤子失败', String(e.message).slice(0, 60), 2400);
+    }
+  }
+  function togglePause() {
+    paused = !paused;
+    const b = document.getElementById('btnPause');
+    if (b) b.textContent = paused ? '\u25B6 继续' : '\u23F8 暂停';
+    SFX.play('click');
+    showBanner(paused ? '推演暂停' : '继续推演', paused ? 'AI 与操作已冻结' : '恢复指挥', 1600);
+    if (!paused) maybeAI();
+  }
   function maybeAI() {
+    if (paused) { window.__aiTracePush && window.__aiTracePush('暂停中'); return; }
     if (!game || game.state.over || aiBusy || briefingOpen) return;
     const side = game.state.phase;
     const isAI = side === 'DE' ? aiDE : aiUS;
@@ -784,27 +936,52 @@ globalThis.UI = (function () {
     // 原版33轮+39轮移植: **必须先等动画队列追平**再走下一个动作——旧写法只按 pace 放行,
     // 一次移动/交火动画 200~600ms, 引擎越跑越前, 画面最多落后引擎 5 格("隔格攻击"假象)。
     // 队列上限 900ms 只是保险: 动画已按真实时间推进且时长压缩, 正常 200~400ms 追平。
-    const waitAnim = () => Promise.race([animQueue.catch(() => {}), new Promise(r => setTimeout(r, 900))]);
+    const waitAnim = () => {
+      // 26p: 动画积压时把等待上限压到 120ms（引擎不等画面），积压清空后恢复 900ms
+      const cap = (renderer && renderer.isBacklogged && renderer.isBacklogged()) ? 120 : 900;
+      return Promise.race([animQueue.catch(() => {}), new Promise(r => setTimeout(r, cap))]);
+    };
     const Sp = aiSpeedCfg();
+    /* 27d 免动画阈值放宽: BULK_N 150→300、时间 8s→20s——正常对局（团级 ~120 动作/阶段）
+       全程可见动画（此前 8s 即转瞬移, 玩家观感"AI 移动很少"）；营级 470 动作的大阶段
+       仍在 20s 转免动画（45s 看门狗前的必要保护）。 */
+    const BULK_N = 300;
+    let bulk = false;
     if (renderer) { renderer.animScale = Sp.anim; renderer.skipMoveAnim = Sp.skipMove; }   // AI 阶段加速(人类操作原速)
     const aiUnits = game.phaseUnits().length;
     const pace = aiUnits > 45 ? Sp.pace[0] : aiUnits > 30 ? Sp.pace[1] : Sp.pace[2];
     try {
+    const phaseT0 = Date.now();
+    const goBulk = why => {
+      if (bulk) return;
+      bulk = true; bulkFast = true;
+      if (renderer) renderer.skipMoveAnim = true;
+      window.__aiTracePush('转入免动画(' + why + ') ' + side + ' R' + game.state.round);
+    };
     AI.executeTurn(game, side, (fn, ms) => {
-      // 极速档: 不排动画帧, 动作连续执行(整段几百毫秒跑完, 画面最后统一刷新)
-      if (Sp.skipMove) { fn(); return; }
+      /* 27h: 团级阶段全程可见动画——时间预算 20s→40s（团级一阶段约 18~22s, 旧阈值正好
+         在中途把它切成瞬移, 玩家观感"大多数棋子按兵不动"）。营级 500+ 动作仍由
+         BULK_N=300 立即免动画（每单位动画在 220×96 上不可行）, 看门狗 45s 保护不变。 */
+      if (!bulk && Date.now() - phaseT0 > 40000) goBulk('阶段>40s');
+      // 极速档 / 大批量: 不排动画帧, 动作连续执行(整段几百毫秒跑完, 画面最后统一刷新)
+      if (Sp.skipMove || bulk) { fn(); return; }
       waitAnim().then(() => setTimeout(fn, ms));
     }, () => {
-      aiBusy = false; window.__aiTracePush('完成 ' + side + ' R' + game.state.round);
+      aiBusy = false; bulkFast = false; window.__aiTracePush('完成 ' + side + ' R' + game.state.round);
       if (renderer) { renderer.animScale = 1; renderer.skipMoveAnim = false; }   // 交还人类原速
       if (myGameNo !== gameNo || !game || game.state.over) { refreshTop(); return; }
       refreshTop(); refreshHint();
       // executeTurn 已调用 endPhase; phase事件期间aiBusy为真被跳过, 这里补跑下一方
       setTimeout(() => maybeAI(), 150);
+    }, {
+      onPlan: n => {
+        if (n >= BULK_N) goBulk('动作>=' + BULK_N);
+      },
     });
     } catch (err) {
       // 24y 自愈: AI 链任何同步异常都不允许卡死整局——复位并强制推进阶段
-      aiBusy = false;
+      aiBusy = false; bulkFast = false;
+      if (renderer) { renderer.animScale = 1; renderer.skipMoveAnim = false; }   // 26z: 表现状态随自愈一并还原
       const msg = '[AI 异常已自愈] ' + String(err && (err.stack || err.message)).slice(0, 140);
       window.__errs.push(msg);
       try { game.log(msg, 'warn'); if (!game.state.over) game.endPhase(); } catch (e2) {}
@@ -815,7 +992,8 @@ globalThis.UI = (function () {
   setInterval(() => {
     if (!game || game.state.over || !aiBusy) return;
     if (Date.now() - (window.__aiBusySince || 0) > 45000) {
-      aiBusy = false;
+      aiBusy = false; bulkFast = false;
+      if (renderer) { renderer.animScale = 1; renderer.skipMoveAnim = false; }   // 26z: 表现状态随看门狗一并还原
       const msg = '[AI 看门狗] 阶段超过 45s 未推进，强制交还并推进';
       window.__errs.push(msg);
       try { game.log(msg, 'warn'); if (!game.state.over) game.endPhase(); } catch (e2) {}
@@ -865,7 +1043,10 @@ globalThis.UI = (function () {
     }
     if (!ds.length) { showBanner('增援抵达', units[units.length - 1].name, 1400); return; }
     // 有档案：横幅提示整批入场，随后依次弹档案卡（24p: 弹卡关闭时横幅即达，本批仍标记已读）
-    const names = ds.map(x => x.d.name).join('、');
+    // 26p: 一次涌入几十个增援时不再把全部名字塞进横幅（会糊满整个屏幕），只列前 3 个 + 总数
+    const names = ds.length > 3
+      ? ds.slice(0, 3).map(x => x.d.name).join('、') + ` 等 ${ds.length} 个建制`
+      : ds.map(x => x.d.name).join('、');
     showBanner('援军抵达', names, 1800);
     if (!dosPop) return;
     for (const x of ds) dossierQueue.push(x);
@@ -1107,29 +1288,56 @@ globalThis.UI = (function () {
       </div>
       <h2 class="sd-h">选择剧本<span class="sd-en">SCENARIO</span></h2>
       <div class="scen-list">
-        <div class="scen sel" data-id="standard">
+        <div class="scen sel" data-id="div_standard">
           <div class="sc-idx">01</div>
           <div class="sc-main">
-            <div class="n">突出部（标准）<span class="sc-origin">原版</span></div>
+            <div class="n">突出部战役（师级）</div>
+            <div class="s">1944.12.16 — 12.27 · 德军攻势窗口 · 12 回合 · 师旅 72 · 34×21</div>
+            <div class="d">师级编制推演（34×21 缩小地图）：每个师/旅一个算子，仅保留两军总指挥部（被摧毁则全军士气崩溃）；本剧本不设补给机制。德军须在时限内冲出马斯河或夺取两大枢纽，美军且战且退。</div>
+          </div>
+          <div class="sc-tick">已选</div>
+        </div>
+        <div class="scen" data-id="div_campaign">
+          <div class="sc-idx">02</div>
+          <div class="sc-main">
+            <div class="n">阿登全战役（师级）</div>
+            <div class="s">1944.12.16 — 1945.1.16 · 24 回合 · 师旅 72 · 34×21</div>
+            <div class="d">两阶段战役（师级编制，34×21 地图）：德军攻势 + 美军反攻，攻守易势。仅两军总指挥部，不设补给机制。</div>
+          </div>
+          <div class="sc-tick">已选</div>
+        </div>
+        <div class="scen" data-id="standard">
+          <div class="sc-idx">03</div>
+          <div class="sc-main">
+            <div class="n">突出部战役（团级）</div>
             <div class="s">1944.12.16 — 12.27 · 12 回合</div>
-            <div class="d">德军须在时间耗尽前冲出马斯河或夺取圣维特与巴斯托涅；美军且战且退，等天气放晴。在新窗口打开原版《阿登1944》完整版运行。</div>
+            <div class="d">德军须在时间耗尽前冲出马斯河或夺取圣维特与巴斯托涅；美军且战且退，等天气放晴。原版冻结数据 + 共享引擎，在本体内直接开局。</div>
           </div>
           <div class="sc-tick">已选</div>
         </div>
         <div class="scen" data-id="campaign">
-          <div class="sc-idx">02</div>
+          <div class="sc-idx">04</div>
           <div class="sc-main">
-            <div class="n">阿登全战役<span class="sc-origin">原版</span></div>
+            <div class="n">阿登全战役（团级）</div>
             <div class="s">1944.12.16 — 1945.1.16 · 24 回合</div>
             <div class="d">两阶段战役：德军攻势 + 美军反攻，攻守易势，直到突出部被削平。在新窗口打开原版《阿登1944》完整版运行。</div>
           </div>
           <div class="sc-tick">已选</div>
         </div>
-        <div class="scen" data-id="big">
-          <div class="sc-idx">03</div>
+        <div class="scen" data-id="big_offensive">
+          <div class="sc-idx">05</div>
           <div class="sc-main">
-            <div class="n">阿登大推演（营级）</div>
-            <div class="s">1944.12.16 — 1945.1.25 · 41 回合 · 1192 营</div>
+            <div class="n">突出部战役（营级）</div>
+            <div class="s">1944.12.16 — 12.27 · 德军攻势窗口 · 12 回合 · 1217 建制</div>
+            <div class="d">大图口径的攻势推演：全部参战营级建制按史实入场，德军须趁美军增援压上之前冲出马斯河或夺取两大枢纽，美军且战且退、等天气放晴。</div>
+          </div>
+          <div class="sc-tick">已选</div>
+        </div>
+        <div class="scen" data-id="big">
+          <div class="sc-idx">06</div>
+          <div class="sc-main">
+            <div class="n">阿登全战役（营级）</div>
+            <div class="s">1944.12.16 — 1945.1.25 · 41 回合 · 1217 建制</div>
             <div class="d">全建制推演：双方参战营级单位全部入场（含英军第30军与德军二梯队），师为抽象指挥，地图扩至马斯河—艾费尔纵深。</div>
           </div>
           <div class="sc-tick">已选</div>
@@ -1152,11 +1360,12 @@ globalThis.UI = (function () {
         <span class="ot-state">关</span>
       </button>
       <div id="selHint" class="sel-hint"><span class="sh-k">已选</span><span class="sh-v"></span></div>
-      <div class="foot">
-        ${hasSave ? '<button id="mResume">继续上次战局</button>' : ''}
-        <button id="mStart" class="primary">开始推演</button>
-      </div>`;
-    const SCEN_NAMES = { standard: '突出部（标准）· 12 回合 · 原版独立运行', campaign: '阿登全战役 · 24 回合 · 原版独立运行', big: '阿登大推演（营级）· 41 回合' };
+        <div class="foot">
+          ${hasSave ? '<button id="mResume">继续上次战局</button>' : ''}
+          <button id="mStart" class="primary">开始推演</button>
+          <button id="mAchv" title="勋章墙 / 战功·老兵·歼敌·重创四榜 / 最近 100 场战绩 / 统计">战绩 · 排行榜</button>
+        </div>`;
+    const SCEN_NAMES = { standard: '突出部战役（团级）· 12 回合', campaign: '阿登全战役（团级）· 24 回合', big_offensive: '突出部战役（营级）· 12 回合', big: '阿登全战役（营级）· 41 回合', div_standard: '突出部战役（师级）· 12 回合', div_campaign: '阿登全战役（师级）· 24 回合' };
     const SIDE_NAMES = { us: '指挥美军（防守反击）', de: '指挥德军（装甲突击）', both: '双人热座（轮流）', watch: 'AI 对战观摩（双方 AI）' };
     let side = 'us';
     let noLimit = false;                                  // 取消回合限制（独立选项，第二十三轮）
@@ -1192,53 +1401,33 @@ globalThis.UI = (function () {
     };
     refreshHint();
     $('modal').style.display = 'flex';
-    /* 24u: 01/02 剧本彻底继承原版——新窗口打开《阿登1944》完整成品。
-       候选位置：① 本体同目录（dist 双击/http 根）② vendor/classic/（开发目录）。
-       http 下先 fetch HEAD 探测防开到 404 页；file:// 无法探测则按序直接开。
-       打开失败（弹窗拦截/文件缺失）才回退内置兼容模式（原数据+共享引擎）。 */
-    const launchClassic = async () => {
-      const cands = ['ardennes44_classic.html', 'vendor/classic/ardennes44_classic.html'];
-      for (const rel of cands) {
-        if (location.protocol !== 'file:') {
-          try { const resp = await fetch(rel, { method: 'HEAD' }); if (!resp.ok) continue; }
-          catch (e) { continue; }
-        }
-        const w = window.open(rel, '_blank');
-        if (w) { try { w.focus(); } catch (e) {} return true; }
-      }
-      return false;
-    };
+    /* 25f: 01/02 改为内置直接开局（原版冻结数据 DATA_BASE + 共享引擎），不再跳转原版文件。
+       用户指令：点击后直接开始。原版语义保留——指挥部毁灭冲击在旧数据下天然关闭
+       （无 OOB_BIG_META），共享引擎的规则与按钮（撤子/暂停/AI 指挥/成就）全部可用；
+       classic.html 仍作为独立完整版随包分发（hub「阿登1944原版」卡进入）。 */
+    /* 27c: 开局菜单上的战绩/成就/排行榜入口——顶栏按钮之外的第二入口, 开局界面一眼可见 */
+    box.querySelector('#mAchv').onclick = () => { SFX.init(); SFX.play('page'); showAchvModal('wall'); };
     box.querySelector('#mStart').onclick = () => {
       SFX.init();            // 用户手势：此刻解锁 AudioContext（浏览器自动播放策略）
-      if (selScen !== 'big') {
-        launchClassic().then(ok => {
-          if (ok) { showBanner('已打开原版', '《阿登1944》在新窗口运行 · 剧本与阵营请在其菜单中选择', 3200); return; }
-          showBanner('原版打开失败', '新窗口被拦截 · 也可手动双击 dist/ardennes44_classic.html · 现改用内置兼容模式', 3400);
-          startCompat();
-        });
-        return;
-      }
-      startBig();
-    };
-    const startBig = () => {
-      achvRole = side; achvNoLimit = noLimit;      // 24v: 供 achvMeta 读取（模块级副本）
-      aiDE = side === 'us' || side === 'watch';
-      aiUS = side === 'de' || side === 'watch';
-      $('btnAIde').classList.toggle('active', aiDE);
-      $('btnAIus').classList.toggle('active', aiUS);
+      achvRole = side; achvNoLimit = noLimit;      // 供 achvMeta 读取（模块级副本）
+      /* 26r 修正: isBigScen 原来只认 big/big_offensive——师级两剧本被漏掉, aiDE/aiUS 恒为 false:
+         观摩局双方 AI 全程不动（永远打不完、结算出不来），对战局敌军纹丝不动。 */
+      /* 26u 修正: 补入团级 standard/campaign——玩家反馈"开 AI 对局还要手动开 AI 才能对战"
+         （团级沿用 25f"双方人类"旧设计, 但群众期望观摩局自动推演/对战局敌方 AI 自动开;
+          热座 both 仍双方手动, 条件式天然保证）。 */
+      const isBigScen = (selScen === 'big' || selScen === 'big_offensive' || selScen === 'div_standard' || selScen === 'div_campaign' || selScen === 'standard' || selScen === 'campaign');
+      aiDE = isBigScen ? (side === 'us' || side === 'watch') : false;
+      aiUS = isBigScen ? (side === 'de' || side === 'watch') : false;
       $('modal').style.display = 'none';
       startGame(selScen, null, { noTurnLimit: noLimit });
       showBriefingQueue();   // 开局指挥官简报（读档不弹）
     };
-    const startCompat = () => { achvRole = side; achvNoLimit = noLimit;   // 24v
-      $('modal').style.display = 'none'; startGame(selScen, null, {}); showBriefingQueue(); };
     if (hasSave) box.querySelector('#mResume').onclick = () => {
       achvRole = null;                            // 24v: 读档沿用存档身份
       try {
         SFX.init();          // 同样是用户手势
         const s = JSON.parse(localStorage.getItem('ardennes44_save'));
         aiDE = false; aiUS = false;
-        $('btnAIde').classList.remove('active'); $('btnAIus').classList.remove('active');
         $('modal').style.display = 'none';
         startGame(s.scenarioId, s);
       } catch (e) { alert('存档读取失败'); }
@@ -1305,16 +1494,43 @@ globalThis.UI = (function () {
     };
   }
   // 像素点阵 → canvas（image-rendering: pixelated，零外部图片）
-  function achvCanvas(iconId, px, silhouette) {
+  function achvCanvas(iconId, px, silhouette, tier) {
     const m = Achv.pixel(iconId, silhouette);
     const cv = document.createElement('canvas');
     if (!m) return cv;
-    const n = m.length, s = Math.max(1, Math.round(px / (n + 2)));   // 24w: 四周留 1px 描边
+    const n = m.length;
+    /* 26q 图标渲染优化：
+       ① HiDPI：按 devicePixelRatio 选整数点距，内联 style 定 CSS 尺寸——
+          旧实现 canvas 36px 被 CSS 拉伸到 40px，任何屏幕上都是模糊的；
+       ② 自动立体斜面：顶邻空像素叠亮边、底邻空像素叠暗边（全部图标受益，无需重绘点阵）；
+       ③ 金牌光晕：已解锁的 gold 成就底后加径向辉光；未解锁剪影不变。 */
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const s = Math.max(2, Math.round(px * dpr / (n + 2)));          // 每格设备像素
+    const cssSize = (n + 2) * s / dpr;
     cv.width = (n + 2) * s; cv.height = (n + 2) * s;
+    cv.style.width = cssSize + 'px'; cv.style.height = cssSize + 'px';
     const ctx = cv.getContext('2d');
+    const occ = (y, x) => y >= 0 && y < n && x >= 0 && x < n && !!m[y][x];
+    /* 26z 阶梯角标: 铜/银/金三档在画布右上角放一枚实心档色角标（fillRect 无抗锯齿,
+       颜色精确）+ 分档辉光（金=原辉光, 银=冷辉, 铜=暖辉）。此前用大半径圆环,
+       半径超出画布被整体裁掉——根本没渲染出来。未解锁剪影不加。 */
+    if (!silhouette) {
+      const tierGlow = tier === 'gold' ? 'rgba(230, 200, 92, 0.30)'
+        : tier === 'silver' ? 'rgba(198, 208, 220, 0.22)' : 'rgba(217, 160, 91, 0.26)';
+      const tierRing = tier === 'gold' ? '#e6c85c' : tier === 'silver' ? '#c8d0da' : '#d9a05b';
+      const glow = ctx.createRadialGradient(cv.width / 2, cv.height / 2, s * 1.5, cv.width / 2, cv.height / 2, cv.width / 2);
+      glow.addColorStop(0, tierGlow);
+      glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 0, cv.width, cv.height);
+      const pip = Math.max(2, Math.round(s * 0.9));
+      ctx.fillStyle = 'rgba(14, 16, 14, 0.92)';
+      ctx.fillRect(cv.width - pip * 2 - 1, 1, pip * 2, pip * 2);
+      ctx.fillStyle = tierRing;
+      ctx.fillRect(cv.width - pip * 2, 2, pip * 2 - 2, pip * 2 - 2);
+    }
     /* 24w 立体化渲染：① 外描边 1px（暗色勾边，轮廓在任何底色上都清晰）
        ② 本体像素 ③ 底部投影 1px（半透明，物体落在墙面上） */
-    const occ = (y, x) => y >= 0 && y < n && x >= 0 && x < n && !!m[y][x];
     if (!silhouette) {
       ctx.fillStyle = 'rgba(20, 24, 20, 0.92)';
       for (let y = -1; y <= n; y++) for (let x = -1; x <= n; x++) {
@@ -1330,9 +1546,14 @@ globalThis.UI = (function () {
       if (!c) continue;
       ctx.fillStyle = c;
       ctx.fillRect((x + 1) * s, (y + 1) * s, s, s);
-      if (!silhouette && !occ(y + 1, x)) {
-        ctx.fillStyle = 'rgba(10, 12, 10, 0.35)';
-        ctx.fillRect((x + 1) * s, (y + 2) * s, s, Math.max(1, s * 0.5));
+      if (!silhouette) {
+        if (!occ(y - 1, x)) {                       // 26q: 顶部受光边
+          ctx.fillStyle = 'rgba(255, 252, 235, 0.26)';
+          ctx.fillRect((x + 1) * s, (y + 1) * s, s, Math.max(1, s * 0.4));
+        } else if (!occ(y + 1, x)) {                // 底部背光边
+          ctx.fillStyle = 'rgba(10, 12, 10, 0.35)';
+          ctx.fillRect((x + 1) * s, (y + 2) * s - Math.max(1, s * 0.4), s, Math.max(1, s * 0.4));
+        }
       }
     }
     return cv;
@@ -1357,7 +1578,7 @@ globalThis.UI = (function () {
     let fresh = [];
     try { fresh = Achv.commit(Achv.evaluate(game)); } catch (e) { console.error('成就求值失败', e); return; }
     for (const id of fresh) { achvQL.push(id); if (!achvLastNew.includes(id)) achvLastNew.push(id); }
-    if (fresh.length) achvPump();
+    if (fresh.length) { achvPump(); toySubmitMeritSoon(); }   // 26t: 解锁突发去抖上报战功
   }
   function achvPump() {
     if (achvBusy || !achvQL.length) return;
@@ -1373,7 +1594,7 @@ globalThis.UI = (function () {
         <span class="ac-en">${def.en}</span>
         <span class="ac-tier ${def.tier}">${TIER_CN[def.tier]}</span>
       </div><div class="ac-quote">${def.quote}</div></div>`;
-    card.querySelector('.ac-ic').appendChild(achvCanvas(def.icon, 48, false));
+    card.querySelector('.ac-ic').appendChild(achvCanvas(def.icon, 48, false, def.tier));
     card.onclick = () => { SFX.play('click'); card.classList.remove('in'); setTimeout(() => card.remove(), 300); };
     host.appendChild(card);
     SFX.play('achv', { tier: def.tier });
@@ -1393,12 +1614,134 @@ globalThis.UI = (function () {
       for (const id of fresh) { if (!achvLastNew.includes(id)) achvLastNew.push(id); }
     } catch (e) { console.error('成就结算失败', e); }
     achvPump();
+    toySubmitMeritNow();   // 26t: 终局战功必报一次（即使本局无新成就，补齐此前漏报）
+    toySubmitCareerBoards();   // 27b: 终局随报老兵/歼敌/重创三榜
   }
 
-  /* ---- 勋章墙 / 战绩 / 统计 面板 ---- */
+  /* —— 26t 战功榜（Toy 排行榜 board 1）：战功 = 已解锁成就积分（金3/银2/铜1）求和。
+     战功只增不减 → 提交当前累计值，服务端"只留最高分"语义天然成立。
+     SDK 只在 Toy/联网环境可用：file://、断网、审核离线包全部静默降级，绝不影响游戏本体。 —— */
+  let toyMeritTimer = 0;
+  function toyReady() {
+    return typeof window !== 'undefined' && window.toy
+      && typeof window.toy.isSupport === 'function' && !window.__toySdkFail;
+  }
+  async function toySubmitMeritNow() {
+    if (!toyReady() || typeof Achv === 'undefined' || !Achv.merit) return;
+    try {
+      if (!(await toy.isSupport('submitScore'))) return;
+      await toy.submitScore({ board: 1, score: Achv.merit() });
+    } catch (e) { /* 未登录 / 限流(307044) / 网络失败——静默，榜是增强不是依赖 */ }
+  }
+  /* 27b: 老兵榜/歼敌榜/重创榜（board 2/3/4）—— 仅终局提交（配额友好，正常对局一次三发+战功一发）。
+     老兵榜 = 累计指挥场数（观摩不计）；歼敌榜 = 指挥局累计歼灭敌方单位数；
+     重创榜 = 本局重创敌军组织度（服务端只留历史最高 → 天然"单局之最"）。 */
+  async function toySubmitCareerBoards() {
+    if (!toyReady() || typeof Achv === 'undefined' || !Achv.history) return;
+    try {
+      if (!(await toy.isSupport('submitScore'))) return;
+      const h = Achv.history();
+      const rec = h.games[h.games.length - 1];
+      if (!rec || rec.role === 'watch') return;   // 观摩不指挥, 不上这三榜
+      await toy.submitScore({ board: 2, score: h.life.commanded || 0 });
+      await toy.submitScore({ board: 3, score: h.life.killUnits || 0 });
+      const casVal = rec.role === 'de' ? (game.state.cas.US || 0)
+        : rec.role === 'us' ? (game.state.cas.DE || 0)
+        : (game.state.cas.DE || 0) + (game.state.cas.US || 0);   // 热座: 双方都是指挥官
+      if (casVal > 0) await toy.submitScore({ board: 4, score: Math.round(casVal) });
+    } catch (e) { /* 静默同战功 */ }
+  }
+  function toySubmitMeritSoon() {
+    clearTimeout(toyMeritTimer);
+    toyMeritTimer = setTimeout(toySubmitMeritNow, 3000);   // 成就解锁常成批：3s 去抖，一批一次调用
+  }
+
+  /* ---- 勋章墙 / 战功榜 / 战绩 / 统计 面板 ---- */
+  // 26t 战功榜状态：手动刷新不轮询（限流是全 Toy 共享额度）
+  // 27b: 四榜（board 1~4）—— 战功/老兵/歼敌/重创；board 5 留作未来扩展
+  let rankPeriod = 'all', rankBoard = 1, rankData = null, rankLoading = false;
+  const RANK_PERIODS = [['all', '总榜'], ['month', '月榜'], ['week', '周榜']];
+  const RANK_BOARDS = [
+    [1, '战功榜', '战功', '成就积分（金3 + 银2 + 铜1）'],
+    [2, '老兵榜', '指挥场数', '累计指挥场数（观摩不计）'],
+    [3, '歼敌榜', '累计歼敌', '指挥局中歼灭的敌方单位总数'],
+    [4, '重创榜', '重创组织度', '单局重创敌军组织度之最'],
+  ];
+  const rankBoardMeta = () => RANK_BOARDS.find(b => b[0] === rankBoard) || RANK_BOARDS[0];
+  const escHtml = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  function rankHead() {
+    const bm = rankBoardMeta();
+    let mine;
+    if (rankBoard === 1) {
+      const m = achvTiers();
+      mine = `<div class="rk-k">我的战功</div><div class="rk-v">${Achv.merit()}</div>
+        <div class="rk-sub">金 ${m.gold[0]}×3 + 银 ${m.silver[0]}×2 + 铜 ${m.bronze[0]}×1</div>`;
+    } else if (rankBoard === 2) {
+      mine = `<div class="rk-k">我的指挥场数</div><div class="rk-v">${Achv.history().life.commanded || 0}</div><div class="rk-sub">${bm[3]}</div>`;
+    } else if (rankBoard === 3) {
+      mine = `<div class="rk-k">我的累计歼敌</div><div class="rk-v">${Achv.history().life.killUnits || 0}</div><div class="rk-sub">${bm[3]}</div>`;
+    } else {
+      const foeCas = game ? ((game.state.cas.DE || 0) + (game.state.cas.US || 0)) : 0;
+      mine = `<div class="rk-k">本局重创</div><div class="rk-v">${foeCas}</div><div class="rk-sub">${bm[3]}（榜取历史最高）</div>`;
+    }
+    return `<div class="rank-head"><div>${mine}</div>
+      <div class="rk-periods"><div class="rk-boards">${RANK_BOARDS.map(([b, n]) => `<button data-b="${b}" class="${rankBoard === b ? 'on' : ''}">${n}</button>`).join('')}</div>
+      ${RANK_PERIODS.map(([k, n]) => `<button data-p="${k}" class="${rankPeriod === k ? 'on' : ''}">${n}</button>`).join('')}
+      <button id="rkRefresh">刷新</button></div></div>`;
+  }
+  function rankRows() {
+    const bm = rankBoardMeta();
+    if (!window.toy || window.__toySdkFail) return `<div class="ach-empty">排行榜需在 B站 Toy 内联网使用（本机/离线不显示）。</div>`;
+    if (rankLoading) return `<div class="ach-empty">榜单加载中…</div>`;
+    if (!rankData || rankData.board !== rankBoard || rankData.period !== rankPeriod) return `<div class="ach-empty">点击「刷新」拉取榜单。</div>`;
+    const { list, my, err } = rankData;
+    const mine = my && my.ranked ? `<div class="rk-mine">我的排名 <b>#${my.rank}</b> · ${bm[2]} ${my.score}</div>`
+      : `<div class="rk-mine">${my ? '尚未上榜（继续推演即可上榜）' : '我的排名需登录后可见'}</div>`;
+    if (err) return mine + `<div class="ach-empty">榜单暂时拉取失败，稍后再试。</div>`;
+    if (!list || !list.length) return mine + `<div class="ach-empty">榜上还没有人——抢第一个上榜。</div>`;
+    return mine + `<table class="ach-rec"><tr><th>#</th><th>指挥官</th><th>${bm[2]}</th></tr>` +
+      list.map(r => `<tr><td>${r.rank}</td><td class="rk-p"><img src="${escHtml(r.avatar)}" referrerpolicy="no-referrer" onerror="this.style.display='none'">${escHtml(r.nickname)}</td><td>${r.score}</td></tr>`).join('') +
+      `</table>`;
+  }
+  async function rankRefresh() {
+    if (!window.toy || window.__toySdkFail || rankLoading) return;
+    rankLoading = true;
+    const body = document.getElementById('achBody');
+    if (body) { const ph = body.querySelector('.ach-empty'); if (ph) ph.textContent = '榜单加载中…'; }
+    const data = { board: rankBoard, period: rankPeriod, list: null, my: null, err: false };
+    try {
+      if (await toy.isSupport('getRankList')) {
+        data.list = await toy.getRankList({ board: rankBoard, period: rankPeriod, limit: 50 });
+      }
+    } catch (e) { data.err = true; }
+    try {
+      if (await toy.isSupport('getMyRank')) data.my = await toy.getMyRank({ board: rankBoard, period: rankPeriod });
+    } catch (e) { /* 未登录等：my=null 显示降级文案 */ }
+    rankLoading = false;
+    rankData = data;
+    const el = document.getElementById('achBody');
+    if (el && document.querySelector('.ach-tabs [data-t="rank"].on')) {
+      el.innerHTML = rankHead() + rankRows();
+      bindRank();
+    }
+  }
+  function bindRank() {
+    const box = $('modalBox');
+    /* 27b: 切换后直接 rankRefresh()（自身完成重渲染）——此前引用不存在的 paint(),
+       ReferenceError 被点击事件吞掉: 26t 的周期切换一直半坏（靠"刷新"按钮掩盖）, 26z 的榜单切换继承同错。 */
+    box.querySelectorAll('.rk-periods button[data-p]').forEach(b => b.onclick = () => { SFX.play('click'); rankPeriod = b.dataset.p; rankRefresh(); });
+    box.querySelectorAll('.rk-boards button[data-b]').forEach(b => b.onclick = () => { SFX.play('click'); rankBoard = +b.dataset.b; rankRefresh(); });
+    const rf = box.querySelector('#rkRefresh');
+    if (rf) rf.onclick = () => { SFX.play('click'); rankRefresh(); };
+  }
+
   function showAchvModal(tab) {
     const box = $('modalBox');
     let cur = tab || 'wall';
+    /* 27c: 开局界面查看战绩/成就/排行榜——面板与开局菜单共用 modalBox, 打开面板会替换菜单;
+       菜单态(或无对局)下提供"返回菜单", "关闭"也回菜单而不是留一块空屏。 */
+    const atMenu = !game || !!box.querySelector('#mStart');
+    const hasSave = (() => { try { return !!localStorage.getItem('ardennes44_save'); } catch (e) { return false; } })();
     const recRows = () => {
       const all = Achv.recent(Achv.HIST_MAX);
       const mine = all.filter(r => r.role === 'de' || r.role === 'us');
@@ -1406,7 +1749,7 @@ globalThis.UI = (function () {
       if (!list.length) return `<div class="ach-empty">还没有战绩记录。打完一局（或让 AI 打完）就会记在这里。</div>`;
       const dt = t => { const d = new Date(t); const p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; };
       const ROLE = { de: '德军', us: '美军', hotseat: '热座', watch: '观战' };
-      const SCEN = { standard: '突出部', campaign: '全战役' };
+      const SCEN = { standard: '突出部(团)', campaign: '全战役(团)', big_offensive: '攻势(营)', big: '全战役(营)' };
       return `<div class="ach-filter"><span>范围</span>
           <button data-f="mine" class="${achvFilter === 'mine' ? 'on' : ''}">我指挥的（${mine.length}）</button>
           <button data-f="all" class="${achvFilter === 'all' ? 'on' : ''}">全部（${all.length}）</button>
@@ -1473,7 +1816,7 @@ globalThis.UI = (function () {
     };
     const wall = () => {
       const un = Achv.unlockedMap();
-      const cats = ['全部', '参与', '胜负', '战术', '史实', '大推演'];
+      const cats = ['全部', '参与', '胜负', '战术', '史实', '师旅', '三线', '大推演'];
       const list = DATA.ACHIEVEMENTS.slice().sort((a, b) => (Achv.TIER_ORDER[b.tier] - Achv.TIER_ORDER[a.tier]) || a.id.localeCompare(b.id));
       return `<div class="ach-filter">${cats.map((c, i) => `<button data-c="${c}" class="${(achvCat === c) ? 'on' : ''}">${c}</button>`).join('')}
         <span style="margin-left:auto">点任一枚看条件与来历</span></div>
@@ -1505,25 +1848,34 @@ globalThis.UI = (function () {
           <div class="ach-prog">勋章 ${p.got} / ${p.total}<br>${achvTierLine()}${barHtml}</div></div>
         <div class="ach-tabs">
           <button data-t="wall" class="${cur === 'wall' ? 'on' : ''}">勋章墙</button>
+          <button data-t="rank" class="${cur === 'rank' ? 'on' : ''}">战功榜</button>
           <button data-t="rec" class="${cur === 'rec' ? 'on' : ''}">最近 100 场</button>
           <button data-t="stat" class="${cur === 'stat' ? 'on' : ''}">统计</button>
         </div>
-        <div id="achBody">${cur === 'wall' ? wall() : cur === 'rec' ? recRows() : statRows()}</div>
+        <div id="achBody">${cur === 'wall' ? wall() : cur === 'rank' ? (rankHead() + rankRows()) : cur === 'rec' ? recRows() : statRows()}</div>
         <div class="ach-foot">
-          <button class="primary" id="achvClose">关 闭</button>
+          ${atMenu ? '<button class="primary" id="achvBack">返回菜单</button><button id="achvClose">关 闭</button>' : '<button class="primary" id="achvClose">关 闭</button>'}
           <button id="achvCard">导出最近一场战绩卡</button>
           <button id="achvWipe">清空战绩与成就</button>
         </div>`;
       // 图标：解锁显色，未解锁剪影
       box.querySelectorAll('.ach-tile').forEach(tile => {
         const d = achvDef(tile.dataset.id); if (!d) return;
-        tile.querySelector('.at-ic').appendChild(achvCanvas(d.icon, 40, !Achv.unlockedMap()[d.id]));
+        tile.querySelector('.at-ic').appendChild(achvCanvas(d.icon, 40, !Achv.unlockedMap()[d.id], d.tier));
       });
       // 终局 AAR 里的"本局新解锁"图标 + 跳转
-      box.querySelectorAll('.an-ic[data-icon]').forEach(sp => sp.appendChild(achvCanvas(sp.dataset.icon, 36, false)));
+      box.querySelectorAll('.an-ic[data-icon]').forEach(sp => sp.appendChild(achvCanvas(sp.dataset.icon, 36, false, (achvDef(sp.dataset.icon) || {}).tier)));
       const anOpen = box.querySelector('#anOpen');
       if (anOpen) anOpen.onclick = () => { SFX.play('click'); showAchvModal('wall'); };
       box.querySelectorAll('.ach-tabs button').forEach(b => b.onclick = () => { SFX.play('click'); cur = b.dataset.t; paint(); });
+      if (cur === 'rank') {
+        bindRank();
+        // 进入页签自动拉一次（每板/每周期仅一次；之后靠手动刷新，不轮询）
+        if (window.toy && !window.__toySdkFail && (!rankData || rankData.board !== rankBoard || rankData.period !== rankPeriod) && !rankLoading) {
+          rankData = { board: rankBoard, period: rankPeriod, list: null, my: null, err: false };
+          rankRefresh();
+        }
+      }
       box.querySelectorAll('.ach-filter button[data-c]').forEach(b => b.onclick = () => { SFX.play('click'); achvCat = b.dataset.c; paint(); });
       box.querySelectorAll('.ach-filter button[data-f]').forEach(b => b.onclick = () => { SFX.play('click'); achvFilter = b.dataset.f; paint(); });
       box.querySelectorAll('.ach-tile').forEach(t => {
@@ -1535,7 +1887,14 @@ globalThis.UI = (function () {
         const rec = Achv.recent(Achv.HIST_MAX)[+b.dataset.i];
         if (rec) exportRecordCard(rec);
       });
-      $('achvClose').onclick = () => { SFX.play('click'); $('modal').style.display = 'none'; };
+      $('achvClose').onclick = () => {
+        SFX.play('click');
+        /* 27c: 菜单态"关闭"=回菜单（否则 modal 隐藏后开局界面就没了） */
+        if (atMenu) showStartModal(hasSave);
+        else $('modal').style.display = 'none';
+      };
+      const achvBack = $('achvBack');
+      if (achvBack) achvBack.onclick = () => { SFX.play('click'); showStartModal(hasSave); };
       $('achvCard').onclick = () => { const r = Achv.recent(1)[0]; if (r) exportRecordCard(r); else showBanner('还没有战绩', '先打完一局', 1600); };
       $('achvWipe').onclick = () => {
         if (!confirm('清空全部成就与战绩记录？此操作不可撤销（当前对局不受影响）。')) return;
@@ -1560,7 +1919,7 @@ globalThis.UI = (function () {
         <div class="ad-desc">${got ? '解锁条件：' : '达成条件：'}${d.desc}</div>
         ${got ? `<div class="ad-quote">${d.quote}</div>` : `<div class="ad-hint">尚未解锁 · 提示：${d.hint}</div>`}
       </div></div>`;
-    host.querySelector('.ad-ic').appendChild(achvCanvas(d.icon, 64, !got));
+    host.querySelector('.ad-ic').appendChild(achvCanvas(d.icon, 64, !got, d.tier));
     host.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
 
@@ -1572,7 +1931,7 @@ globalThis.UI = (function () {
     const c = cv.getContext('2d');
     c.fillStyle = '#14181d'; c.fillRect(0, 0, W, H);
     c.strokeStyle = 'rgba(216,183,74,0.35)'; c.lineWidth = 3; c.strokeRect(28, 28, W - 56, H - 56);
-    const SCEN = { standard: '突出部（标准）', campaign: '阿登全战役' };
+    const SCEN = { standard: '突出部战役(团)', campaign: '阿登全战役(团)', big_offensive: '突出部战役(营)', big: '阿登全战役(营)' };
     const ROLE = { de: '德军指挥官', us: '美军指挥官', hotseat: '双人热座', watch: '观战' };
     c.fillStyle = '#78808a'; c.font = '20px Consolas, monospace';
     c.fillText('ARDENNES 1944 · AFTER ACTION', 64, 96);
@@ -1629,6 +1988,103 @@ globalThis.UI = (function () {
     } catch (e) { showBanner('导出失败', '浏览器拒绝保存（' + e.message + '）', 2400); }
   }
 
+  /* —— 25a AI 指挥面板（屏幕中心, 军事风）—— */
+  function showAIModal() {
+    const box = $('modalBox');
+    box.className = 'box ach-box';
+    const paint = () => {
+      const row = (label, desc, on, fn) =>
+        '<div class="aim-row"><div><div class="aim-t">' + label + '</div><div class="aim-d">' + desc + '</div></div>' +
+        '<button class="aim-sw ' + (on ? 'on' : '') + '" data-fn="' + fn + '">' + (on ? '开启' : '关闭') + '</button></div>';
+      const spd = (k, label, desc) => {
+        const cur = aiSpeedCfg().key;
+        return '<button class="aim-pc' + (cur === k ? ' on' : '') + '" data-k="' + k + '"><b>' + label + '</b><span>' + desc + '</span></button>';
+      };
+      /* 27e: 进攻强度四档（AGGRO 预设, 双 AI 通用, 持久化） */
+      const agPresets = AI.aggroPresets ? AI.aggroPresets() : {};
+      const agKey = AI.aggroKey ? AI.aggroKey() : 'attack';
+      const agBtn = k => {
+        const p = agPresets[k];
+        if (!p) return '';
+        return '<button class="aim-pc' + (agKey === k ? ' on' : '') + '" data-ag="' + k + '"><b>' + p.label + '</b><span>' +
+          '战力比 ≥' + p.attackRatio + (p.forceAdvance ? ' · 强制前进' : ' · 允许驻守') + '</span></button>';
+      };
+      box.innerHTML =
+        '<div class="ach-head"><h1>AI 指挥</h1>' +
+        '<div class="ach-prog">接管任一阵营的阶段推演<br>开关即时生效</div></div>' +
+        '<div class="aim-sec">' +
+        row('德军 AI', '德军阶段由 AI 自动推演（装甲突击 · 夺要点渡河）', aiDE, 'de') +
+        row('美军 AI', '美军阶段由 AI 自动推演（防守反击 · 迟滞待晴）', aiUS, 'us') +
+        '</div>' +
+        '<div class="aim-sec"><div class="aim-t">行动速度</div><div class="aim-speeds">' +
+        spd('standard', '标准', '完整动画 · 观战体验最佳') +
+        spd('fast', '快速', '动画压缩 · 兼顾观感与节奏') +
+        spd('turbo', '极速', '跳过移动动画 · 直出结果') +
+        '</div></div>' +
+        '<div class="aim-sec"><div class="aim-t">进攻强度（双 AI 通用 · 即时生效）</div><div class="aim-speeds">' +
+        agBtn('defend') + agBtn('measured') + agBtn('attack') + agBtn('frenzy') +
+        '</div><div class="aim-ag-note">固守=只打有把握的仗并允许据守；狂暴=1:3 也强攻、三格内有敌即扑。影响 AI 双方，不影响你的操作。</div>' +
+        '</div>' +
+        '<div class="foot"><button class="primary" id="aimClose">关 闭</button></div>';
+      $('modal').style.display = 'flex';
+      box.querySelectorAll('.aim-sw').forEach(b => b.onclick = () => {
+        SFX.play('click');
+        if (b.dataset.fn === 'de') aiDE = !aiDE;
+        else aiUS = !aiUS;
+        paint(); maybeAI();
+      });
+      box.querySelectorAll('.aim-pc[data-k]').forEach(b => b.onclick = () => {   // 27e: 限定速度档, 避免误绑进攻强度按钮
+        SFX.play('click');
+        const i = AI_SPEEDS.findIndex(s2 => s2.key === b.dataset.k);
+        if (i >= 0) { aiSpeed = i; try { localStorage.setItem('ardennes44_aispeed', aiSpeedCfg().key); } catch (e) {} }
+        paint();
+      });
+      /* 27e: 进攻强度档位——应用预设 + 持久化 */
+      box.querySelectorAll('.aim-pc[data-ag]').forEach(b => b.onclick = () => {
+        SFX.play('click');
+        if (AI.setAggroPreset) {
+          AI.setAggroPreset(b.dataset.ag);
+          try { localStorage.setItem('ardennes44_aggro', b.dataset.ag); } catch (e) {}
+        }
+        paint();
+      });
+      box.querySelector('#aimClose').onclick = () => { SFX.play('click'); $('modal').style.display = 'none'; };
+    };
+    paint();
+  }
+
+  /* —— 25a 「⚙ 开关」浮层：音效 / 档案弹卡 —— */
+  function toggleSwitchesPop(anchorBtn) {
+    let pop = document.getElementById('swPop');
+    if (pop) { pop.remove(); return; }
+    pop = document.createElement('div');
+    pop.id = 'swPop';
+    pop.innerHTML =
+      '<div class="sw-row"><span class="sw-k">♪ 音效</span><button id="btnSfx" class="sw-btn"></button></div>' +
+      '<div class="sw-row"><span class="sw-k">✉ 档案弹卡</span><button id="btnDosPop" class="sw-btn"></button></div>';
+    document.body.appendChild(pop);
+    const r = anchorBtn.getBoundingClientRect();
+    pop.style.left = Math.min(window.innerWidth - 230, r.right - 190) + 'px';
+    pop.style.top = (r.bottom + 8) + 'px';
+    const sfxB = pop.querySelector('#btnSfx');
+    sfxB.onclick = () => { SFX.init(); const m = SFX.toggle(); renderSfxBtn(); if (!m) SFX.play('click'); };
+    const dosB = pop.querySelector('#btnDosPop');
+    dosB.onclick = () => {
+      dosPop = !dosPop;
+      try { localStorage.setItem('ardennes44_dospop', dosPop ? '1' : '0'); } catch (e) { /* ignore */ }
+      renderDosPopBtn(); SFX.play('click');
+      if (!dosPop && dossierOpen) { dossierQueue = []; $('modal').style.display = 'none'; dossierOpen = false; maybeAI(); }
+    };
+    renderSfxBtn(); renderDosPopBtn();
+    setTimeout(() => {
+      document.addEventListener('click', function close(e) {
+        if (pop.contains(e.target) || e.target === anchorBtn) return;
+        pop.remove();
+        document.removeEventListener('click', close);
+      });
+    }, 0);
+  }
+
   function showRulesModal() {
     const box = $('modalBox');
     box.className = 'box';
@@ -1643,7 +2099,7 @@ globalThis.UI = (function () {
         <b>城镇</b>：主城防御×2.2，小镇×1.7。占领即翻控制权。<br>
         <b>炮兵</b>：可3-4格内远程轰击（不受反击），或支援友邻进攻（美+7/德+5）。美军射程4/德军3；雾天射程-1。<br>
         <b>支援资产</b>：每方每回合获得令牌（选中单位后在左侧面板发放，算子角标 反/工/补/急/空）：反坦克小组×2（巴祖卡/铁拳——配属步兵，反装甲防御，首次遭纯装甲攻击战力比再降一档并消耗）、野战救护所×1（恢复4点组织度）、炮火急袭×1（该单位下次攻击+4，本阶段内有效）、补充兵员×1（满编单位组织上限+2）、野战工事×1（防御×1.25）、<b>防空火力×2</b>（德：88毫米高炮群 / 美：博福斯40毫米——该单位遭空袭时 50% 概率使本次空袭伤害减半）。<b>工兵营自带筑垒能力</b>：选中工兵营点"筑垒"即可就地构筑野战工事，<b>不消耗本方令牌</b>（每单位限一次）。<br>
-        <b>补给</b>：处于指挥部(半径7)或己方补给点(半径7)内。<b>城市补给随占领翻转</b>：任何单位进入敌方城镇（移动/攻击推进/撤退落点），该城控制权即转占领方并<b>立刻为占领方单位提供补给</b>；原占有方失去此补给源，其失供在下个己方阶段结算（仍有 2 回合宽限）。夺回即翻回。<b>断补有宽限期</b>：被切断后的前 2 个回合完全不受影响；第 3 回合起——步兵类（步兵/伞兵/国民掷弹兵团）攻防小幅降低（×0.85），<b>其他兵种（装甲/炮兵/工兵等）攻防减半（×0.5）</b>，同时组织度每阶段 -1、移动力减半；空降兵豁免全部损耗。恢复补给后一切立即恢复正常。<br>
+        <b>补给</b>（师级剧本不设补给机制，全军恒有补给）：处于指挥部(半径7)或己方补给点(半径7)内。<b>城市补给随占领翻转</b>：任何单位进入敌方城镇（移动/攻击推进/撤退落点），该城控制权即转占领方并<b>立刻为占领方单位提供补给</b>；原占有方失去此补给源，其失供在下个己方阶段结算（仍有 2 回合宽限）。夺回即翻回。<b>断补有宽限期</b>：被切断后的前 2 个回合完全不受影响；第 3 回合起——步兵类（步兵/伞兵/国民掷弹兵团）攻防小幅降低（×0.85），<b>其他兵种（装甲/炮兵/工兵等）攻防减半（×0.5）</b>，同时组织度每阶段 -1、移动力减半；空降兵豁免全部损耗。恢复补给后一切立即恢复正常。<br>
         <b>组织度</b>：部队血量，攻防随比例缩水。有补给每回合+2（城镇+3），归零歼灭。<br>
         <b>指挥部</b>：每军、每集团军及美/德总指挥部各一座（组织度 军10/集团军15/总部20，攻防同步兵营），位于所辖部队后方并作为补给源。<b>被摧毁冲击</b>：军部被毁→该军全部单位组织度与攻防各-2；集团军司令部被毁→该集团军-3；总指挥部被毁→本国籍全军-4（扣减下限1，不致死、一次性，后续增援不受影响）。<br>
         <b>燃料</b>：德军全局燃料池，每参战装甲师每回合扣1。耗尽装甲-3移动。夺取斯塔沃洛/斯帕油库+燃料。<br>
@@ -1808,8 +2264,15 @@ globalThis.UI = (function () {
     // 按剧本把 globalThis.DATA 指向大推演数据集; 读档同样按存档剧本切换。
     // 注意: DATA_BASE 仅在 data_big.js 中定义(大推演成品才有);
     // 原版成品(11 脚本)无此文件, DATA 从未被切换, 保持原指即可。
-    if (scenarioId === 'big' && globalThis.DATA_BIG) globalThis.DATA = globalThis.DATA_BIG;
-    else if (globalThis.DATA_BASE) globalThis.DATA = globalThis.DATA_BASE;
+    // 26p 修正: 按剧本精确选择数据集——26f 引入师级时把 big/big_offensive 也并进了 DATA_DIV 分支,
+    // 而 DATA_DIV 没有这两个剧本, new Game 读 scen.fuelDE 直接抛异常(点开局即卡死)。
+    if (scenarioId === 'div_standard' || scenarioId === 'div_campaign') {
+      globalThis.DATA = globalThis.DATA_DIV || globalThis.DATA_BASE;
+    } else if (scenarioId === 'big' || scenarioId === 'big_offensive') {
+      globalThis.DATA = globalThis.DATA_BIG || globalThis.DATA_BASE;
+    } else if (globalThis.DATA_BASE) {
+      globalThis.DATA = globalThis.DATA_BASE;
+    }
     // 重置援军档案状态(新开一局/读档都清空)
     reinBuf = []; if (reinTimer) { clearTimeout(reinTimer); reinTimer = 0; }
     dossierQueue = []; dossierShown = new Set(); dossierOpen = false;
@@ -1862,32 +2325,28 @@ globalThis.UI = (function () {
     renderer.onHexClick = onHexClick;
     renderer.onHexHover = onHexHover;
     $('btnEnd').onclick = () => { if (!aiBusy && game && !game.state.over) { exitAdvance(); game.endPhase(); } };
-    $('btnAIde').onclick = () => { SFX.play('click'); aiDE = !aiDE; $('btnAIde').classList.toggle('active', aiDE); maybeAI(); };
-    $('btnAIus').onclick = () => { SFX.play('click'); aiUS = !aiUS; $('btnAIus').classList.toggle('active', aiUS); maybeAI(); };
     $('btnOOB').onclick = showUnitsModal;
     const bd = document.getElementById('btnDossiers');
     if (bd) bd.onclick = () => { SFX.play('page'); showDossierArchive(); };
     // 24p: 增援档案弹卡开关（记忆偏好）；运行中关闭=清空待弹队列并收起当前卡
-    const bp = document.getElementById('btnDosPop');
-    if (bp) bp.onclick = () => {
-      dosPop = !dosPop;
-      try { localStorage.setItem('ardennes44_dospop', dosPop ? '1' : '0'); } catch (e) { /* ignore */ }
-      renderDosPopBtn(); SFX.play('click');
-      if (!dosPop && dossierOpen) { dossierQueue = []; $('modal').style.display = 'none'; dossierOpen = false; maybeAI(); }
-    };
-    renderDosPopBtn();
+
     const _ba = document.getElementById('btnAchv');
     if (_ba) _ba.onclick = () => { SFX.play('click'); showAchvModal('wall'); };   // 24v 战绩
+    // —— 25a 撤子/暂停/AI 指挥/开关浮层 ——
+    const _bu = document.getElementById('btnUndo');
+    if (_bu) _bu.onclick = () => { SFX.play('click'); doUndo(); };
+    const _bp = document.getElementById('btnPause');
+    if (_bp) _bp.onclick = togglePause;
+    const _bai = document.getElementById('btnAI');
+    if (_bai) _bai.onclick = () => { SFX.play('click'); showAIModal(); };
+    const _bt = document.getElementById('btnToggles');
+    if (_bt) _bt.onclick = (e) => { e.stopPropagation(); SFX.play('click'); toggleSwitchesPop(_bt); };
     $('btnRules').onclick = showRulesModal;
     $('btnRestart').onclick = () => { SFX.play('click'); showStartModal(!!localStorage.getItem('ardennes44_save')); };
     $('btnLogToggle').onclick = () => { SFX.play('click'); toggleLogPanel(); };
-    // 音效开关（2026-10 第二十二轮）：状态写入 localStorage，关闭时按钮变暗且文字改为「音效 关」
-    $('btnSfx').onclick = () => { SFX.init(); const m = SFX.toggle(); renderSfxBtn(); if (!m) SFX.play('click'); };
-    renderSfxBtn();
+    // 25a: 音效/档案卡合并进「⚙ 开关」浮层（按钮 id 保留, 渲染函数复用）
+    renderSfxBtn(); renderDosPopBtn();
     // AI 速度三档(原版39轮移植): 点击循环切换, 记忆偏好
-    const _bs = document.getElementById('btnAISpeed');
-    if (_bs) _bs.onclick = () => { aiSpeed = (aiSpeed + 1) % AI_SPEEDS.length; try { localStorage.setItem('ardennes44_aispeed', aiSpeedCfg().key); } catch (e) {} renderAiSpeedBtn(); SFX.play('click'); };
-    renderAiSpeedBtn();
     /* 24g: 后台预热全部史实照片(档案/简报/胜利), 用到时已在缓存 */
     setTimeout(warmPhotos, 2000);
     /* ---- 窄屏菜单（第二十九轮）：顶栏按钮收入 #topBtns 下拉，由 ☰ 开合 ---- */
@@ -1965,3 +2424,4 @@ globalThis.UI = (function () {
 
   return { init, showStartModal, hasSave };
 })();
+

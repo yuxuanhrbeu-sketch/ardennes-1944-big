@@ -30,10 +30,10 @@
 
   /* ---------- 顶栏 ---------- */
   #topbar {
-    position: absolute; top: 0; left: 0; right: 0; height: 54px;
+    position: absolute; top: 0; left: 0; right: 0; min-height: 54px;
     background: var(--bg-panel); border-bottom: 1px solid var(--edge);
-    display: flex; align-items: center; gap: 14px; padding: 0 16px; z-index: 10;
-    font-size: 13px;
+    display: flex; align-items: center; gap: 10px 14px; padding: 8px 16px; z-index: 10;
+    font-size: 13px; flex-wrap: wrap;   /* 24z2: 宽屏单行, 窗口窄时按钮组自动落第二行 */
   }
   #topbar .title { font-weight: bold; font-size: 16px; letter-spacing: 2px; color: var(--gold); }
   #topbar .sep { width: 1px; height: 26px; background: var(--edge); }
@@ -47,7 +47,11 @@
   #topbar .grow { flex: 1; }
   /* 第二十九轮: 顶栏拆成「状态组 + 按钮组」两个容器。
      桌面端样式与拆分前完全一致; 窄屏下按钮组整体折叠成菜单、状态组横向滚动(见文末 @media)。 */
-  #topStats, #topBtns { display: flex; align-items: center; gap: 14px; }
+  #topStats, #topBtns { display: flex; align-items: center; gap: 12px; }
+  #topStats { min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  #topStats::-webkit-scrollbar { height: 0; }
+  
+  #topBtns { flex-wrap: wrap; row-gap: 6px; }
   #topBtns { gap: 6px; }
   #btnMenu { display: none; }
   /* 相机控制条: 左下角常驻(放大/缩小/全图), 触屏没有滚轮时用它兜底 */
@@ -67,6 +71,61 @@
   button.active { background: #55612e; border-color: #7d9140; }
   /* 音效开关：关闭态明确变暗（不靠颜色单独传达状态，文字同步改为「音效 关」） */
   #btnSfx.off, #btnDosPop.off { opacity: 0.5; }
+  /* —— 24z 顶栏重构：分组分隔 / 图标前缀 / 主次分级 —— */
+  #topBtns { gap: 6px; }
+  .tb-sep { width: 1px; height: 22px; background: var(--edge); margin: 0 7px; flex: none; }
+  #topBtns button {
+    padding: 6px 12px; border-radius: 6px; white-space: nowrap; font-size: 12.5px;
+    background: linear-gradient(180deg, #2e353d, #232a31); border: 1px solid var(--edge);
+  }
+  #topBtns button:hover { background: #3d4650; border-color: #6a7683; }
+  #btnEnd {
+    background: linear-gradient(180deg, #8a6a24, #6e521c); border-color: #c9a227;
+    font-weight: 700; letter-spacing: 1px; padding: 6px 16px;
+  }
+  #btnEnd::before { content: '\25B5\00A0'; font-size: 10px; }
+  #btnEnd:hover { background: #a3812e; border-color: #e6c85c; }
+  #btnOOB::before { content: '\25A4\00A0'; }
+  #btnDossiers::before { content: '\25A3\00A0'; }
+  #btnAchv::before { content: '\2726\00A0'; color: #e6c85c; }
+  #btnRules::before { content: '?\00A0'; color: #9aa39a; }
+  #btnSfx::before, #btnDosPop::before { content: '\266A\00A0'; }
+  #btnAISpeed::before { content: '\23F1\00A0'; }
+  #btnAIde, #btnAIus { min-width: 68px; text-align: center; }
+  #btnRestart { border-color: #6e4038; }
+  #btnRestart:hover { background: #4a2b26; border-color: #9a5a4e; }
+  #btnUndo::before { content: '\21B6\00A0'; }
+  #btnUndo:disabled { opacity: 0.4; cursor: default; }
+  #btnAI { border-color: #55612e; }
+  #btnAI::before { content: '\2694\00A0'; color: #b8c4b0; }
+  #btnToggles::before { content: '\2699\00A0'; }
+  #btnPause { min-width: 74px; text-align: center; }
+  /* 25a AI 指挥面板（复用 ach-box 军事风） */
+  .aim-sec { margin: 14px 0; }
+  .aim-row { display: flex; align-items: center; gap: 14px; padding: 11px 4px; border-bottom: 1px solid var(--hair); }
+  .aim-row:last-child { border-bottom: none; }
+  .aim-t { font-family: var(--disp); font-size: 14.5px; letter-spacing: 1px; color: #f0ead6; }
+  .aim-d { font-size: 11.5px; color: #8f968f; margin-top: 3px; line-height: 1.5; }
+  .aim-row > div:first-child { flex: 1; }
+  .aim-sw { min-width: 74px; min-height: 34px; border-radius: 6px; font-weight: 700; }
+  .aim-sw.on { background: #55612e; border-color: #7d9140; color: #e8e4d8; }
+  .aim-speeds { display: flex; gap: 10px; margin-top: 9px; flex-wrap: wrap; }
+  .aim-pc { flex: 1; min-width: 140px; text-align: left; padding: 10px 12px; border-radius: 6px;
+    background: #1c2127; border: 1px solid var(--hair); cursor: pointer; color: #cfd3c8; }
+  .aim-pc b { display: block; font-size: 13px; letter-spacing: 1px; margin-bottom: 3px; }
+  .aim-pc span { font-size: 11px; color: #8f968f; line-height: 1.4; }
+  .aim-pc.on { border-color: #c9a227; background: rgba(230, 200, 92, 0.07); }
+  .aim-pc.on b { color: #e6c85c; }
+  /* 25a 开关浮层 */
+  #swPop {
+    position: fixed; z-index: 45; width: 220px; padding: 10px 12px;
+    background: rgba(14, 17, 21, 0.97); border: 1px solid var(--edge); border-radius: 8px;
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5);
+  }
+  .sw-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+  .sw-k { flex: 1; font-size: 12.5px; color: #cfd3c8; letter-spacing: 1px; }
+  .sw-btn { min-width: 64px; text-align: center; min-height: 30px; }
+  .sw-btn.off { opacity: 0.5; }
   /* 启动状态/失败面板(原版35轮移植) */
   #bootStatus { position: absolute; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; background: rgba(5, 7, 10, 0.88); }
   #bootStatus[hidden] { display: none; }
@@ -556,6 +615,19 @@
   .ach-detail .ad-quote { font-size: 12.5px; color: #e2ddc9; border-left: 2px solid var(--brass); padding-left: 10px; margin-top: 10px; line-height: 1.6; }
 
   .ach-rec { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 11px; }
+  /* 26t 战功榜 */
+  .rank-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--hair); border-radius: 3px; background: #15191e; margin-bottom: 12px; }
+  .rank-head .rk-k { font-size: 10px; letter-spacing: 2px; color: #8f968f; }
+  .rank-head .rk-v { font-family: var(--disp); font-size: 30px; color: var(--gold); line-height: 1.15; }
+  .rank-head .rk-sub { font-family: var(--mono); font-size: 10px; color: #6f766f; margin-top: 2px; }
+  .rank-head .rk-periods { display: flex; gap: 6px; }
+  .rank-head .rk-periods button { font-family: var(--mono); font-size: 10.5px; padding: 5px 9px; background: #10141a; color: #a8afa6; border: 1px solid var(--hair); border-radius: 3px; cursor: pointer; }
+  .rank-head .rk-periods button.on { color: var(--gold); border-color: rgba(230, 200, 92, 0.45); }
+  .rank-head .rk-periods button:hover { border-color: var(--rule); }
+  .rk-mine { font-size: 11.5px; color: #cfd3c8; padding: 8px 2px 10px; }
+  .rk-mine b { color: var(--gold); }
+  .rk-p { display: flex; align-items: center; gap: 7px; color: #e8e4d8; }
+  .rk-p img { width: 20px; height: 20px; border-radius: 50%; flex: none; background: #22262c; }
   .ach-rec th, .ach-rec td { padding: 6px 8px; border-bottom: 1px solid var(--hair); text-align: left; white-space: nowrap; }
   .ach-rec th { color: #8f968f; font-weight: 400; letter-spacing: 1px; position: sticky; top: 0; background: #14181d; }
   .ach-rec td.w { color: #a8c8e8; } .ach-rec td.l { color: #e8907a; }
@@ -659,17 +731,19 @@
     <span class="grow"></span>
     <button id="btnMenu" title="展开/收起菜单" aria-label="菜单">☰</button>
     <div id="topBtns">
-      <button id="btnEnd" class="primary">结束阶段</button>
-      <button id="btnAIde">德军AI</button>
-      <button id="btnAIus">美军AI</button>
+      <button id="btnEnd" class="primary" title="结束当前阶段">结束阶段</button>
+      <button id="btnUndo" title="撤子：仅可撤回你最近的一手（移动/攻击/炮击/空袭/发放支援）。战损、令牌、城镇归属一并回滚，骰运重新掷取">撤子</button>
+      <button id="btnPause" title="暂停/继续：冻结 AI 推演与操作（AI 当前阶段跑完后停在你按下的时刻）">⏸ 暂停</button>
+      <span class="tb-sep" aria-hidden="true"></span>
+      <button id="btnAI" title="AI 指挥：德军/美军 AI 开关与行动速度">⚔ AI 指挥</button>
+      <span class="tb-sep" aria-hidden="true"></span>
       <button id="btnOOB" title="查看当前在场的双方部队，按攻击+防御之和由高到低排序；点击一行可在地图上定位">兵力一览</button>
       <button id="btnDossiers" title="部队档案：全部建制的史实简介（开局在场 + 增援）">部队档案</button>
       <button id="btnAchv" title="成就与战绩：勋章墙 / 最近 100 场 / 统计（与原版《阿登1944》互通）">战绩</button>
-  <button id="btnRules">规则</button>
-      <button id="btnSfx" title="音效开关（程序化合成，无外部音频文件）">音效 开</button>
-      <button id="btnDosPop" title="增援档案弹卡开关：关=入场只显示横幅提示，全部档案仍可随时点「部队档案」查阅">档案卡 开</button>
-      <button id="btnAISpeed" title="AI 行动速度：标准 / 快速 / 极速（极速跳过移动动画，适合观摩整局；记忆偏好）">AI 快速</button>
-      <button id="btnRestart">重新开始</button>
+      <span class="tb-sep" aria-hidden="true"></span>
+      <button id="btnRules">规则</button>
+      <button id="btnToggles" title="音效 / 增援档案弹卡 开关">⚙ 开关</button>
+      <button id="btnRestart" title="放弃当前战局，回到剧本选择">重新开始</button>
     </div>
   </div>
 
@@ -782,8 +856,12 @@
 <script src="js/data.js"></script>
 <script src="js/achv_data.js"></script>
 <script src="js/achv.js"></script>
+<!-- 26t: B站 Toy SDK（战功榜/云能力）。https 显式协议——file:// 下加载失败静默降级，游戏离线可玩不受影响 -->
+<script src="https://s1.hdslb.com/bfs/seed/toy/app/sdk/toy-sdk.js" onerror="window.__toySdkFail=1"></script>
 <script src="js/data_big_oob.js"></script>
 <script src="js/data_big.js"></script>
+<script src="js/data_div_oob.js"></script>
+<script src="js/data_div.js"></script>
 <script src="js/dossiers_big_de1.js"></script>
 <script src="js/dossiers_big_de2.js"></script>
 <script src="js/dossiers_big_de3.js"></script>

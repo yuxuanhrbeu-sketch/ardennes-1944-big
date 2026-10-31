@@ -65,7 +65,7 @@ if (!html.includes(THREE_TAG)) throw new Error('index.html 缺少 vendor three �
   ].join('\n');
   html = html.replace(THREE_TAG, LOADER);
 }
-const scripts = ['hex.js', 'data.js', 'achv_data.js', 'achv.js', 'data_big_oob.js', 'data_big.js', 'dossiers_big_de1.js', 'dossiers_big_de2.js', 'dossiers_big_de3.js', 'dossiers_big_de4.js', 'dossiers_big_de5.js', 'dossiers_big_us1.js', 'dossiers_big_us2.js', 'dossiers_big_us3.js', 'dossiers_big_us4.js', 'dossiers_big_uk.js', 'dossiers_big_uk2.js', 'dossiers_big.js', 'mapgen.js', 'combat.js', 'game.js', 'ai.js', 'render.js', 'audio.js', 'ui.js', 'intro.js', 'main.js'];
+const scripts = ['hex.js', 'data.js', 'achv_data.js', 'achv.js', 'data_big_oob.js', 'data_big.js', 'data_div_oob.js', 'data_div.js', 'dossiers_big_de1.js', 'dossiers_big_de2.js', 'dossiers_big_de3.js', 'dossiers_big_de4.js', 'dossiers_big_de5.js', 'dossiers_big_us1.js', 'dossiers_big_us2.js', 'dossiers_big_us3.js', 'dossiers_big_us4.js', 'dossiers_big_uk.js', 'dossiers_big_uk2.js', 'dossiers_big.js', 'mapgen.js', 'combat.js', 'game.js', 'ai.js', 'render.js', 'audio.js', 'ui.js', 'intro.js', 'main.js'];
 /* 24m: 历史照片内嵌——vendor/photos/manifest.json 存在时(tools/fetch_photos.js 下载),
    把照片以 base64 dataURI 注入 window.__PHOTO_EMBED, ui 优先取内嵌(断网秒开)。 */
 let photoEmbed = '';

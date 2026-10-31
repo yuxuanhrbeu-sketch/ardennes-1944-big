@@ -2,7 +2,7 @@
 /* 一次性：按 集团军→军→师 汇总 1192 营编成树 */
 const fs = require('fs');
 const path = require('path');
-const ROOT = path.join(__dirname, '..');
+const ROOT = 'D:/ardennes-big';
 for (const f of ['hex.js', 'data.js', 'data_big_oob.js', 'data_big.js']) {
   eval(fs.readFileSync(path.join(ROOT, 'js', f), 'utf8'));
 }

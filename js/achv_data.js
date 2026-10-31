@@ -14,7 +14,9 @@ const ACH_PALETTE = {
     y: '#e6c85c',
     h: '#f2ead2',        // 高光（羊皮纸亮部）
     d: '#262b25',        // 暗部（24w 渲染立体化）
-    e: '#9aa3ad',        // 金属亮灰（24w 新图标）        // 亮黄铜
+    e: '#9aa3ad',        // 金属亮灰（24w 新图标）
+    c: '#b0722f',        // 青铜（26z 铜章系图标）      // 亮黄铜
+    C: '#d9a05b',        // 青铜亮部（26z）
   };
 
   const ACH_ICONS = {
@@ -221,6 +223,106 @@ const ACH_PALETTE = {
       '.kehhwwwwwwhhek.', '.kehhhwwwwhhhhek', '..kehhhhhhhhek..', '..kkeeeeeeeekk..',
       '....kkkkkkkk....', '................', '................', '................',
     ],
+    /* —— 26q 三图六剧本扩充（师旅 / 三线）—— */
+    // 师徽：盾形 + 倒 V 臂章（师级编制）
+    div_badge: [
+      '................', '..kkkkkkkkkkkk..', '..kwwwwwwwwwwk..', '..kwwwwwwwwwwk..',
+      '..kwgg....ggwk..', '..kwwgg..ggwwk..', '..kwwwggggwwwk..', '..kwwwwggwwwwk..',
+      '..kwwwwwwwwwwk..', '..kwwwwwwwwwwk..', '..kwwwwwwwwwwk..', '...kwwwwwwwwk...',
+      '....kwwwwwwk....', '.....kwwwwk.....', '......kkkk......', '................',
+    ],
+    // 月桂枝环抱金环（决定性胜利 · 全线告捷）
+    laurel: [
+      '................', '...o........o...', '..oo........oo..', '..o..gggggg..o..',
+      '..o.g......g.o..', '.oo.g......g.oo.', '.o..g......g..o.', '.o..g......g..o.',
+      '.o..g......g..o.', '.oo.g......g.oo.', '..o.g......g.o..', '..o..gggggg..o..',
+      '..oo........oo..', '...o..oooo..o...', '......oooo......', '................',
+    ],
+    // 将星（指挥部收割者）
+    gen_star: [
+      '................', '................', '.......gg.......', '.......gg.......',
+      '......gggg......', '..gggggggggggg..', '...gggggggggg...', '....gggggggg....',
+      '...gggg..gggg...', '..ggg......ggg..', '..gg........gg..', '.gg..........gg.',
+      '.g............g.', '................', '................', '................',
+    ],
+    // 三枚递增的六角（三线推演：营 / 团 / 师）
+    tri_hex: [
+      '................', '................', '.......gg.......', '......gggg......',
+      '......gggg......', '.......gg.......', '....oooooooo....', '...oooooooooo...',
+      '...oooooooooo...', '....oooooooo....', '................', '..bbbbbbbbbbbb..',
+      '.bbbbbbbbbbbbbb.', '.bbbbbbbbbbbbbb.', '..bbbbbbbbbbbb..', '................',
+    ],
+    // 六枚小六角（六剧本全览）
+    six_hex: [
+      '................', '..gggg...rrrr...', '.gggggg.rrrrrr..', '.gggggg.rrrrrr..',
+      '..gggg...rrrr...', '................', '..bbbb...oooo...', '.bbbbbb.oooooo..',
+      '.bbbbbb.oooooo..', '..bbbb...oooo...', '................', '..yyyy...ssss...',
+      '.yyyyyy.ssssss..', '.yyyyyy.ssssss..', '..yyyy...ssss...', '................',
+    ],
+    // 金印封蜡（一言九鼎：不悔棋）
+    seal: [
+      '................', '................', '....gggggggg....', '...gggggggggg...',
+      '..gggwwwwwwggg..', '..ggwwwwwwwwgg..', '..ggwwwkkwwwgg..', '..ggwwkkkkwwgg..',
+      '..ggwwwkkwwwgg..', '..ggwwwwwwwwgg..', '..gggwwwwwwggg..', '...gggggggggg...',
+      '....gggggggg....', '..rr........rr..', '..rr........rr..', '................',
+    ],
+    // 闪电（雷霆初击）
+    lightning: [
+      '................', '.........gggg...', '........gggg....', '.......gggg.....',
+      '......gggg......', '.gggggggggg.....', '..gggggggggg....', '.....ggggg......',
+      '....ggggg.......', '...ggggg........', '..ggggg.........', '..ggg...........',
+      '..gg............', '................', '................', '................',
+    ],
+    // 交叉剑（战胜全面进攻 AI）
+    swords: [
+      '................', '................', '.ee..........ee.', '..ee........ee..',
+      '...ee......ee...', '....ee....ee....', '.....ee..ee.....', '......eeee......',
+      '......eeee......', '.....ee..ee.....', '....gg....gg....', '...gggg..gggg...',
+      '..ggg......ggg..', '.gg..........gg.', '................', '................',
+    ],
+    /* —— 26z 铜章扩充（44 条铜成就主题图标）—— */
+    // 铜勋章：缎带 + 青铜圆盘 + 五角星（铜成就收藏系）
+    bronze_medal: [
+      '................', '...kkk...kkk....', '...krrk.krrk....', '...krrk.krrk....',
+      '...krrk.krrk....', '....kkkkkkkk....', '...kcccccccck...', '..kcccccccccck..',
+      '..kccckggkccck..', '..kcckggggkcck..', '..kcckggggkcck..', '..kccckggkccck..',
+      '..kcccccccccck..', '...kcccccccck...', '....kkkkkkkk....', '................',
+    ],
+    // 占领旗：军旗插上城镇（占领 / 攻城系）
+    capture_flag: [
+      '................', '..kkkkkkkk......', '..kccccccck.....', '..kccccccck.....',
+      '..kcccwwcck.....', '..kccccccck.....', '..kccccck.......', '..kccccccck.....',
+      '..kccccccck.....', '..kccccccck.....', '..kkkkkkkk......', '....kk..........',
+      '....kk..........', '....kkkk........', '....kkkk........', '................',
+    ],
+    // 通信机：天线 + 面板（通信枢纽 / 补给线）
+    radio_sig: [
+      '................', '.....k....k.....', '......k..k......', '.......kk.......',
+      '................', '..kkkkkkkkkkkk..', '..kwwwwwwwwwwk..', '..kwwwwkkwwwwk..',
+      '..kwwwwkkwwwwk..', '..kwwwwwwwwwwk..', '..kwkkkkkkkkwk..', '..kkkkkkkkkkkk..',
+      '...kk......kk...', '................', '................', '................',
+    ],
+    // 双星（德美两军都赢过）
+    star_pair: [
+      '................', '................', '................', '.....g.....g....',
+      '....ggg...ggg...', '..gggggg.gggggg.', '....ggg...ggg...', '.....g.....g....',
+      '................', '................', '................', '................',
+      '................', '................', '................', '................',
+    ],
+    // 雾灯（雾天交锋）
+    fog_lamp: [
+      '................', '..wwww....wwww..', '................', '......kkk.......',
+      '....kkkkkk......', '....kyyyyk......', '....kywwyk......', '....kywwyk......',
+      '....kyyyyk......', '....kkkkkk......', '.....kkkk.......', '..wwww....wwww..',
+      '................', '................', '................', '................',
+    ],
+    // 行军靴踏雪（雪地行军）
+    snow_boot: [
+      '................', '................', '....kkkkkk......', '....kffffk......',
+      '....kffffk......', '....kffffk......', '....kffffkk.....', '...kkffffffk....',
+      '..kkkkkkkkkk....', '.kdkdkdkdkdkd...', '..wwww....wwww..', '.wwwwwwwwwwww...',
+      '................', '................', '................', '................',
+    ],
   };
 
   // 24 条核心成就（判定实现见 js/achv.js 的 CHECKS 表，键 = id）
@@ -331,5 +433,129 @@ const ACH_PALETTE = {
       desc: '第101空降师在巴斯托涅连续驻守不少于 12 个阶段', hint: '守满 12 个阶段不丢城', quote: '"Nuts!"——麦考利夫的答复之后，是十二个阶段的死守。' },
     { id: 'ardennes_1944', name: '阿登 1944', en: 'ARDENNES 1944', tier: 'gold', cat: '大推演', icon: 'eagle',
       desc: '解锁全部大推演成就', hint: '集齐本页所有「大推演」成就', quote: '把这场战役的每一个角落都走过一遍——你已经是 1944 年冬天的老兵。' },
+    /* —— 26q：三图六剧本扩充（师旅 / 三线）—— */
+    { id: 'div_debut', name: '铁甲雄师', en: 'IRON DIVISIONS', tier: 'bronze', cat: '师旅', icon: 'div_badge',
+      desc: '完成一局师级剧本（突出部或全战役）', hint: '一个算子就是一个师', quote: '一个算子就是一个师。摊开这张地图的那一刻，你就是集团军司令。' },
+    { id: 'div_de_keil', name: '师级钳形攻势', en: 'DIVISIONAL PINCER', tier: 'silver', cat: '师旅', icon: 'pincer',
+      desc: '师级剧本中达成德军决定性胜利', hint: '让足够多的装甲师冲过马斯河', quote: '师级别的突破——历史上他们差了最后一步，你替他们走完。' },
+    { id: 'div_us_clear', name: '雪洗阿登', en: 'CLEANING THE SNOW', tier: 'gold', cat: '师旅', icon: 'laurel',
+      desc: '《阿登全战役（师级）》中达成美军决定性胜利', hint: '收复全部枢纽并重创德军', quote: '一月的反攻推平了整个突出部——这是参谋部作业的满分答卷。' },
+    { id: 'div_meuse', name: '雄师抵河', en: 'DIVISIONS AT THE MEUSE', tier: 'silver', cat: '师旅', icon: 'west_arrow_river',
+      desc: '师级剧本中德军有师冲过马斯河', hint: '至少让一个师摸到西岸', quote: '师旗出现在马斯河西岸——1944 年 12 月没人相信这可能。' },
+    { id: 'div_grinder', name: '师级绞肉机', en: 'THE DIVISIONAL GRINDER', tier: 'silver', cat: '师旅', icon: 'tally',
+      desc: '师级剧本单回合内歼灭不少于 4 个师旅', hint: '一个回合吃掉四个师', quote: '参谋部的地图上，四个师的番号在一个下午内被画掉了。' },
+    { id: 'tri_scale', name: '三线推演', en: 'THREE SCALES', tier: 'silver', cat: '三线', icon: 'tri_hex',
+      desc: '分别完成师、团、营三种粒度的推演各一局', hint: '三种地图都打一遍', quote: '营、团、师——三副沙盘，同一场战役。' },
+    { id: 'tri_decisive', name: '全线告捷', en: 'VICTORY ON ALL SCALES', tier: 'gold', cat: '三线', icon: 'laurel',
+      desc: '师、团、营三种粒度各达成一次决定性胜利', hint: '在每一档粒度都拿下决定性胜利', quote: '无论沙盘多大，你都能把攻势走到底。' },
+    { id: 'six_fronts', name: '六图全览', en: 'ALL SIX FRONTS', tier: 'gold', cat: '三线', icon: 'six_hex',
+      desc: '六个剧本各完成一局', hint: '六个剧本，一个不落', quote: '从 12 月 16 日的雾到 1 月 25 日的雪——六张地图都留下过你的脚印。' },
+    { id: 'stop_aggro', name: '挡住洪流', en: 'STOPPING THE FLOOD', tier: 'gold', cat: '三线', icon: 'swords',
+      desc: '营级全战役中指挥美军战胜全面进攻的德军 AI', hint: '对面的 AI 每一回合都会扑上来', quote: '他们不惜代价地扑了一整个冬天——雪原上留下的全是坟。' },
+    { id: 'break_aggro', name: '逆流冲垮', en: 'BREAKING THE COUNTERFLOW', tier: 'silver', cat: '三线', icon: 'swords',
+      desc: '营级全战役中指挥德军战胜全面进攻的美军 AI', hint: '美军的反攻同样不留余力', quote: '对面的反击一波接着一波——把每一波都砸回去。' },
+    { id: 'hq_triple', name: '指挥部收割者', en: 'HQ REAPER', tier: 'silver', cat: '大推演', icon: 'gen_star',
+      desc: '同一局中摧毁至少 3 座敌方指挥部', hint: '军部与集团军司令部都算', quote: '三面将旗落地，前线的电台一片死寂。' },
+    { id: 'no_undo', name: '一言九鼎', en: 'NO SECOND THOUGHTS', tier: 'silver', cat: '大推演', icon: 'seal',
+      desc: '全程不使用悔棋完成一局营级全战役', hint: '每一手都算数', quote: '命令下达就不再更改——1944 年的参谋部没有撤销键。' },
+    { id: 'blitz_start', name: '雷霆初击', en: 'THUNDER FIRST STRIKE', tier: 'bronze', cat: '战术', icon: 'lightning',
+      desc: '第 1 回合内歼灭至少 2 个敌方算子', hint: '开局就见血', quote: '炮火准备之后，第一份伤亡报告在天亮前就送到了。' },
+    { id: 'tri_complete', name: '全线满章', en: 'FULL HONORS', tier: 'gold', cat: '三线', icon: 'laurel',
+      desc: '解锁全部「师旅」与「三线」类成就', hint: '集齐这两类', quote: '师、团、营三副沙盘，每一寸都走遍了。' },
+    /* —— 26z 铜章扩充（44 条，金银铜比例 1:2:3）—— */
+    // —— 参与（9）——
+    { id: 'second_front', name: '再进雪原', en: 'BACK TO THE SNOW', tier: 'bronze', cat: '参与', icon: 'snow',
+      desc: '累计完成 2 局推演', hint: '第二道刻痕', quote: '第二道刻痕。雪原认得你了。' },
+    { id: 'five_campaigns', name: '五番战', en: 'FIVE CAMPAIGNS', tier: 'bronze', cat: '参与', icon: 'tally',
+      desc: '累计完成 5 局推演', hint: '第五次写下命令', quote: '第五次在地图前坐下——参谋部开始认你的字迹。' },
+    { id: 'first_de_command', name: '执掌德国指挥权', en: 'GERMAN COMMAND', tier: 'bronze', cat: '参与', icon: 'commanders',
+      desc: '以德军指挥身份完成一局', hint: '换到地图的另一边', quote: '换到地图另一边——你会发现，每一道命令都比想象中重。' },
+    { id: 'first_us_command', name: '临危受命', en: 'STAND THE LINE', tier: 'bronze', cat: '参与', icon: 'ridge',
+      desc: '以美军指挥身份完成一局', hint: '从守开始的一局', quote: '从守开始的一局。守得住，才谈得上反攻。' },
+    { id: 'hotseat_showdown', name: '同帐争锋', en: 'FRIENDLY STEEL', tier: 'bronze', cat: '参与', icon: 'commanders',
+      desc: '双人热座局中分出胜负', hint: '总得有一个指挥官服气', quote: '同一张桌子，两份地图，最后只有一个名字被写进战报。' },
+    { id: 'div_full_winter', name: '师级长冬', en: 'DIVISIONAL WINTER', tier: 'bronze', cat: '参与', icon: 'div_badge',
+      desc: '完成《阿登全战役（师级）》24 个回合', hint: '师级尺度的整个冬天', quote: '师级别的冬天——每天都是一整个团的命运。' },
+    { id: 'weather_fog_debut', name: '雾中首战', en: 'FOG OF WAR', tier: 'bronze', cat: '参与', icon: 'fog_arrow',
+      desc: '经历过雾天回合并完成一局', hint: '雾散之前，谁也看不清谁', quote: '雾散之前，谁也看不清谁——1944 年的预报从来不靠谱。' },
+    { id: 'weather_snow_seen', name: '风雪同行', en: 'IN THE SNOWFALL', tier: 'bronze', cat: '参与', icon: 'snow',
+      desc: '经历过雪天回合并完成一局', hint: '雪会盖住一切——除了弹坑', quote: '雪会盖住一切——除了弹坑和名字。' },
+    { id: 'watch_division', name: '师席旁听', en: 'OBSERVING DIVISIONS', tier: 'bronze', cat: '参与', icon: 'binoculars',
+      desc: '完整观摩一局师级剧本', hint: '看 AI 是怎么用师的', quote: '看 AI 是怎么用师的——师不是营的放大，是另一种战争。' },
+    // —— 胜负（8）——
+    { id: 'de_tactical', name: '战术胜利', en: 'TACTICAL VICTORY', tier: 'bronze', cat: '胜负', icon: 'swords',
+      desc: '德军达成战术胜利（未渡河但重创美军）', hint: '没到河，账面上也赢了', quote: '没摸到马斯河，但战报上的账——是你赢了。' },
+    { id: 'us_hold_fast', name: '稳住战线', en: 'HOLD THE LINE', tier: 'bronze', cat: '胜负', icon: 'shield',
+      desc: '美军达成一般胜利（守住即胜）', hint: '不完美，但足够', quote: '不完美的胜利也是胜利——战线还在，冬天就会过去。' },
+    { id: 'both_crowns', name: '两顶桂冠', en: 'BOTH CROWNS', tier: 'bronze', cat: '胜负', icon: 'star_pair',
+      desc: '终身账上德、美军各胜至少一局', hint: '两边都赢过才算懂这场仗', quote: '两边都赢过——你才算真的懂这场仗。' },
+    { id: 'underdog_win', name: '逆风得胜', en: 'WINNING BEHIND', tier: 'bronze', cat: '胜负', icon: 'scales',
+      desc: '在己方战损比例更高的情况下获胜', hint: '账面输了，仗赢了', quote: '账面难看，仗赢了——参谋部只认结果。' },
+    { id: 'retake_two', name: '收复失地', en: 'TAKEN BACK', tier: 'bronze', cat: '胜负', icon: 'pincer',
+      desc: '同一局中收复 2 座曾被敌军占领的己方城镇', hint: '丢了，就夺回来', quote: '丢了，就夺回来。地图上的每一条线都写得下这句话。' },
+    { id: 'exits_three', name: '三营过河', en: 'THREE BATTALIONS ACROSS', tier: 'bronze', cat: '胜负', icon: 'west_arrow_river',
+      desc: '单局中 3 个装甲/摩托化单位冲出马斯河', hint: '一个营是奇迹，三个是战术', quote: '一个营过河是奇迹，三个过河——那是战术。' },
+    { id: 'hub_st_vith', name: '圣维特的钟声', en: 'THE BELLS OF ST. VITH', tier: 'bronze', cat: '胜负', icon: 'twin_towns',
+      desc: '占领圣维特', hint: '十字路口的第一声钟', quote: '圣维特的十字路口——拿下它，北翼的路就通了。' },
+    { id: 'hub_bastogne', name: '巴斯托涅之门', en: 'THE GATE', tier: 'bronze', cat: '胜负', icon: 'twin_towns',
+      desc: '占领巴斯托涅', hint: '七条公路的必经之门', quote: '七条公路在这里交汇——门开了，仗就活了一半。' },
+    // —— 战术（12）——
+    { id: 'arty_blood', name: '炮兵见血', en: 'ARTILLERY DRAWS BLOOD', tier: 'bronze', cat: '战术', icon: 'artillery',
+      desc: '任一炮兵营的远程射击直接造成击杀', hint: '不用冲锋也能见血', quote: '不用冲锋也能见血——这就是你养炮兵的理由。' },
+    { id: 'air_blood', name: '天罚之爪', en: 'TALONS FROM ABOVE', tier: 'bronze', cat: '战术', icon: 'aircraft',
+      desc: '空袭直接击破一个敌方单位', hint: '从天上摘掉一个算子', quote: '从天上摘掉一个算子——地面的兄弟们会感谢你。' },
+    { id: 'engineer_trigger', name: '工兵上阵', en: 'ENGINEERS IN ACTION', tier: 'bronze', cat: '战术', icon: 'engineer_bridge',
+      desc: '工兵营参与一次攻击', hint: '工兵也是战斗兵种', quote: '别把工兵留在后排——他们的炸药包也是火力。' },
+    { id: 'recon_five', name: '铁脚尖兵', en: 'IRON SOLES', tier: 'bronze', cat: '战术', icon: 'recon',
+      desc: '侦察营单回合移动 5 格及以上', hint: '跑起来，地图就是你的', quote: '跑起来，地图就是你的。' },
+    { id: 'sig_lifeline', name: '通信命脉', en: 'THE LIFELINE', tier: 'bronze', cat: '战术', icon: 'radio_sig',
+      desc: '通信枢纽营坚持到终局且未损失', hint: '它活着，前线就活着', quote: '它活着，前线的每一支部队就还听得到命令。' },
+    { id: 'armor_six', name: '装甲突进', en: 'ARMORED DASH', tier: 'bronze', cat: '战术', icon: 'tank',
+      desc: '装甲营单回合移动 6 格及以上', hint: '发动机全开', quote: '油门踩到底——突破就是这样开始的。' },
+    { id: 'inf_hold_three', name: '步兵坚守', en: 'INFANTRY HOLDS', tier: 'bronze', cat: '战术', icon: 'ridge',
+      desc: '步兵营在至少 2 个敌人相邻的包围态势下连续坚守 3 个阶段', hint: '被围住也不后退', quote: '被围住也不后退——步兵的荣誉就在这里。' },
+    { id: 'anti_arty', name: '逐炮行动', en: 'COUNTER-BATTERY', tier: 'bronze', cat: '战术', icon: 'shell_burst',
+      desc: '击毁至少 1 个敌方炮兵营', hint: '先打掉对方的嗓子', quote: '先打掉对方的嗓子，再打它的牙。' },
+    { id: 'rkt_debut', name: '火箭炮首射', en: 'ROCKET DEBUT', tier: 'bronze', cat: '战术', icon: 'shell_burst',
+      desc: '火箭炮营完成一次覆盖齐射', hint: '听见那声啸了吗', quote: 'Nebelwerfer 的啸声——对面听见的版本可不太一样。' },
+    { id: 'fog_fight', name: '雾中交锋', en: 'FIGHT IN THE FOG', tier: 'bronze', cat: '战术', icon: 'fog_lamp',
+      desc: '在雾天回合内完成一次攻击', hint: '雾是双刃的', quote: '雾是双刃的——你看不清敌人，敌人也看不清你。' },
+    { id: 'snow_moves', name: '雪地行军', en: 'MARCHING IN SNOW', tier: 'bronze', cat: '战术', icon: 'snow_boot',
+      desc: '单局雪天回合内累计完成 5 次移动', hint: '雪不认人，路在人走', quote: '雪不认人，路是人走出来的。' },
+    { id: 'first_capture', name: '首克敌城', en: 'FIRST CAPTURE', tier: 'bronze', cat: '战术', icon: 'capture_flag',
+      desc: '占领一座开局不属于己方的城镇', hint: '旗帜换面的那一刻', quote: '旗帜换面的那一刻——地图改了一笔，你的名字也改了一笔。' },
+    // —— 大推演（8）——
+    { id: 'big_offense_debut', name: '大推演开门', en: 'GRAND OFFENSIVE DEBUT', tier: 'bronze', cat: '大推演', icon: 'eagle',
+      desc: '完成一局《突出部战役（营级·12 回合）》', hint: '营级攻势第一局', quote: '营级攻势第一局——十二个回合，六百个营的故事从这里开始。' },
+    { id: 'big_camp_twelve', name: '大战役前哨', en: 'TWELVE DAYS IN', tier: 'bronze', cat: '大推演', icon: 'six_hex',
+      desc: '完成《阿登全战役（营级）》前 12 个回合', hint: '先走完第一个月', quote: '先走完第一个月——剩下的冬天，回头再战。' },
+    { id: 'big_round_five', name: '单回合五营', en: 'FIVE IN A ROUND', tier: 'bronze', cat: '大推演', icon: 'tally',
+      desc: '营级剧本单回合歼敌 5 个营', hint: '一个回合,五个番号', quote: '一个回合，五个番号从作战序列里消失。' },
+    { id: 'big_tier2_town', name: '首下重镇', en: 'A REAL TOWN', tier: 'bronze', cat: '大推演', icon: 'capture_flag',
+      desc: '营级剧本中占领 1 座重要城镇（tier ≥ 2）', hint: '大点的地方才有名字', quote: '大点的地方才有名字——名字进了战报，就算数。' },
+    { id: 'big_towns_five', name: '五城在握', en: 'FIVE TOWNS HELD', tier: 'bronze', cat: '大推演', icon: 'twin_towns',
+      desc: '营级剧本中累计占领 5 座开局不属于己方的城镇', hint: '把版图一笔一笔改掉', quote: '一笔一笔改掉开局时的版图——这就是攻势。' },
+    { id: 'big_support_three', name: '后勤三件套', en: 'LOGISTICS TRIO', tier: 'bronze', cat: '大推演', icon: 'supply',
+      desc: '营级单局中使用 3 种不同的支援资产', hint: '后方的每一种本事都试一遍', quote: '后方的每一种本事都试一遍——前线才立得住。' },
+    { id: 'big_fj_strike', name: '绿魔鬼出击', en: 'GREEN DEVILS STRIKE', tier: 'bronze', cat: '大推演', icon: 'parachute',
+      desc: '空降营（FJ）参与一次攻击', hint: '让伞兵也啃一口', quote: '伞兵生来就是被包围的——但他们也想啃一口。' },
+    { id: 'big_armor_five', name: '铁锤五锤', en: 'FIVE HAMMERS', tier: 'bronze', cat: '大推演', icon: 'tank',
+      desc: '营级剧本中歼灭 5 个敌方装甲营', hint: '每锤下去都是一辆坦克', quote: '每一锤下去，都是一辆再也开不动的坦克。' },
+    // —— 师旅（3）——
+    { id: 'div_round_two', name: '师级双杀', en: 'DIVISIONAL DOUBLE', tier: 'bronze', cat: '师旅', icon: 'tally',
+      desc: '师级剧本单回合歼灭 2 个师旅', hint: '一个下午,两个师', quote: '一个下午，两个师的番号被画掉——师级尺度的闪电战。' },
+    { id: 'div_hold_hub', name: '师级守点', en: 'DIVISION HOLDS', tier: 'bronze', cat: '师旅', icon: 'div_badge',
+      desc: '师级剧本终局时仍控制任一枢纽城镇', hint: '打到最后一刻还在你手里', quote: '打到最后一刻还在你手里——这就是师长的职业素养。' },
+    { id: 'div_near_meuse', name: '兵临河岸', en: 'NEAR THE MEUSE', tier: 'bronze', cat: '师旅', icon: 'west_arrow_river',
+      desc: '师级剧本中德军师推进到马斯河以东 3 格以内', hint: '师部望远镜里已经能看见河', quote: '望远镜里已经能看见河面——1944 年 12 月的真实终点。' },
+    // —— 收藏 / 三线（4）——
+    { id: 'tri_watch', name: '三席旁听', en: 'THREE OBSERVATIONS', tier: 'bronze', cat: '三线', icon: 'binoculars',
+      desc: '在师、团、营三种粒度各完整观摩一局', hint: '看 AI 打三种沙盘', quote: '三种沙盘各看一遍——你会开始理解这场战役的骨架。' },
+    { id: 'bronze_ten', name: '铜星十枚', en: 'TEN BRONZE STARS', tier: 'bronze', cat: '收藏', icon: 'bronze_medal',
+      desc: '解锁 10 枚铜级成就', hint: '铜章也掷地有声', quote: '铜章也掷地有声——每一枚都是雪地里真实走过的路。' },
+    { id: 'bronze_twentyfive', name: '铜章满袋', en: 'A BAG OF BRONZE', tier: 'bronze', cat: '收藏', icon: 'bronze_medal',
+      desc: '解锁 25 枚铜级成就', hint: '半面墙都是铜色的光', quote: '半面墙都是铜色的光——低调，但扎实。' },
+    { id: 'all_cats_taste', name: '八类尝鲜', en: 'A TASTE OF EVERYTHING', tier: 'bronze', cat: '收藏', icon: 'ribbon',
+      desc: '八个类别中每一类都解锁至少 1 枚成就', hint: '每种味道都尝一口', quote: '每种味道都尝一口——这面墙开始有你的形状了。' },
   ];
 globalThis.ACH_DATA = { ACH_PALETTE, ACH_ICONS, ACHIEVEMENTS };

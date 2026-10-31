@@ -12,7 +12,7 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-const ROOT = path.join(__dirname, '..');
+const ROOT = 'D:/ardennes-big';
 const OUT = path.join(ROOT, 'vendor', 'photos', 'bulk');
 const MF = path.join(OUT, 'manifest_bulk.json');
 if (!fs.existsSync(OUT)) fs.mkdirSync(OUT, { recursive: true });

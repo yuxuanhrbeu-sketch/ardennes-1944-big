@@ -200,6 +200,15 @@ const SUFFIX = { INF:'步', VGD:'掷', FJ:'伞', ABN:'伞', MOT:'掷', ARM:'装'
                  ART:'炮', TD:'歼', RECON:'侦', ENGR:'工', SIG:'通', RKT:'火',
                  HQK:'军部', HQA:'集部', HQT:'总部' };
 function romanOf(s) { const m = s.match(/第(IV|III|II|I)营/); return m ? m[1] : ''; }
+/* 26o: B站审核整改——部队名称脱敏（去纳粹人名/尊称；"党卫军"作为史学译名保留） */
+const SENSITIVE_MAP = [["阿道夫·希特勒警卫旗队","警卫旗队"],["警卫旗队","警卫旗队"],["希特勒青年团","青年团"],["元首护卫旅","最高统帅部护卫旅"],["元首掷弹兵旅","最高统帅部掷弹兵旅"],["元首卫队旅","最高统帅部护卫旅"],["元首掷弹旅","最高统帅部掷弹兵旅"]];
+function deSensitize(name) {
+  if (!name) return name;
+  let out = name;
+  for (const [from, to] of SENSITIVE_MAP) out = out.split(from).join(to);
+  return out;
+}
+
 function makeAbbr(name, parent, type, side, used) {
   let s = '';
   const own = name.match(/(\d+)/);
@@ -952,7 +961,7 @@ function main() {
       const arrive = Math.max(0, startToTurn(dates.split('—')[0]));
 
       const generic = /^第(IV|III|II|I|\d)营$/.test(cname.trim());
-      const dispName = generic ? (parent.replace(/（.*?）/g, '') + '·' + cname.trim()) : cname.trim();
+      const dispName = deSensitize(generic ? (parent.replace(/（.*?）/g, '') + '·' + cname.trim()) : cname.trim());   // 26o 脱敏
       const orgFinal = orgFor(side, !!s.nat && s.nat === 'UK', type, div, dispName || cname, note);   // 24i: 满编=分层maxOrg
 
       // —— 扇区解析：师 → 军 → 集团军 三级兜底（键带阵营前缀，避免德美同名师撞键）——
@@ -1021,10 +1030,10 @@ function main() {
     oob[side].push([id, dispName, abbr, type, rec.atk, rec.def, rec.mov, pos[0], pos[1], rec.arrive, rec.orgFinal, rec.orgFinal]);   // 24i: [10]=初始org(=满编) [11]=maxOrg
     meta[id] = {
       nat: s.nat || (side === 'DE' ? 'DE' : 'US'),
-      army: rec.army, corps: rec.corps, div: rec.div, parent: rec.parent,
+      army: rec.army, corps: rec.corps, div: deSensitize(rec.div), parent: deSensitize(rec.parent),   // 26o 脱敏
       raw: rec.raw, src: rec.srcIsRec ? '记载' : '推定', srcRaw: rec.srcRaw,
       from: rec.from, to: rec.to, firstWave: rec.firstWave, firstDay: rec.firstDay,
-      orig: rec.oname, note: rec.note,
+      orig: deSensitize(rec.oname), note: rec.note,   // 26o
     };
   }
 

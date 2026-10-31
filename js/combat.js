@@ -26,8 +26,13 @@ globalThis.Combat = (function () {
     return DATA.ODDS_ORDER[j];
   }
 
-  // 攻击正面限制: 最多3个地面单位 + 2个炮兵单位(择优)
-  const FRONTAGE = 3, FRONTAGE_ARTY = 2;
+  // 攻击正面限制: 最多 N 个地面单位 + 2 个炮兵单位(择优)
+  // 27g: N 可调（AGGRO 档位驱动, 默认 5）——"全军出击"的基础: 大编队时只有正面内单位
+  //      计战力并受伤害（resolve 伤害循环改为遍历截取后的正面名单），超编支援不白挨打。
+  let FRONTAGE = 5;
+  const FRONTAGE_ARTY = 2;
+  function setFrontage(n) { if (n >= 1 && n <= 12) FRONTAGE = n; }
+  function getFrontage() { return FRONTAGE; }
   function capAttack(atts, arty) {
     const a2 = (atts || []).slice()
       .sort((x, y) => (y.atk * y.org / y.maxOrg) - (x.atk * x.org / x.maxOrg))
@@ -216,7 +221,10 @@ globalThis.Combat = (function () {
   //        atkDmg, defDmg, atkDead, defDead }
   // 战损以"组织度"计：atkDmg/defDmg = 攻方/守方本回合实扣组织度合计，供结算弹窗与战报分开显示。
   function resolve(game, attUnits, defUnit, artyUnits) {
-    const pv = preview(game, attUnits, defUnit, artyUnits);
+    /* 27g: 伤害/撤退只结算正面内单位——此前遍历原始数组, 超编支援单位全额挨打却
+       不计战力（"全军出击"被引擎数学卡死的根源）。大编队进攻从此成立。 */
+    const cap = capAttack(attUnits, artyUnits);
+    const pv = preview(game, cap.atts, defUnit, cap.arty);
     const d1 = 1 + Math.floor(game.rng() * 6);
     const d2 = 1 + Math.floor(game.rng() * 6);
     const roll = d1 + d2;
@@ -225,19 +233,26 @@ globalThis.Combat = (function () {
     if (!pv.key || !pv.row) { out.result = 'NO'; out.events.push({ t: 'msg', msg: '战力比不足 1:4，无法攻击' }); return out; }
     const result = pv.row[roll - 2];
     out.result = result;
-    const dm = DATA.DMG[result];
+    const dmRaw = DATA.DMG[result];
+    /* 26k: 师级剧本伤害同比放大（与放大的组织度匹配；默认 1 时逐位不变） */
+    const DSC = DATA.DMG_SCALE || 1;
+    const dm = DSC === 1 ? dmRaw : Object.assign({}, dmRaw, {
+      atk: dmRaw.atk ? Math.max(1, Math.round(dmRaw.atk * DSC)) : 0,
+      def: dmRaw.def ? Math.max(1, Math.round(dmRaw.def * DSC)) : 0,
+    });
     const defHexKey = Hex.key(defUnit.c, defUnit.r);
 
     // 攻方伤害与撤退
     // atkDmg/defDmg = 名义伤害(供 game._cas, 保持既有口径)；atkReal/defReal = 组织度"实扣"(供弹窗与终局明细)
     let atkDmg = 0, defDmg = 0, atkReal = 0, defReal = 0;
+    const fAtt = cap.atts, fArty = cap.arty;
     if (dm.atk > 0) {
-      for (const a of attUnits) {
+      for (const a of fAtt) {
         atkReal += game.dmgOrg(a, dm.atk, 'atk');
         atkDmg += dm.atk;
         if (a.org <= 0) { out.deadUnits.push(a); out.events.push({ t: 'destroy', unit: a }); }
       }
-      if (artyUnits) for (const a of artyUnits) {
+      if (fArty.length) for (const a of fArty) {
         const ad = Math.min(1, dm.atk - 2);
         atkReal += game.dmgOrg(a, ad, 'atk');
         atkDmg += ad;
@@ -245,11 +260,11 @@ globalThis.Combat = (function () {
       }
     }
     if (dm.atkRetreat) {
-      for (const a of attUnits) {
+      for (const a of fAtt) {
         if (a.org <= 0) continue;
         const to = retreatHex(game, a, defUnit);
         if (to) { out.retreats.push({ unit: a, to }); game._setPos(a, to.c, to.r); game._occupyTown(a, to.c, to.r); }   // 24q: 撤退落点占城同规则
-        else { atkReal += game.dmgOrg(a, 2, 'atk'); atkDmg += 2; if (a.org <= 0) { out.deadUnits.push(a); out.events.push({ t: 'destroy', unit: a }); } }
+        else { const stuckA = Math.max(1, Math.round(2 * (DATA.DMG_SCALE || 1))); atkReal += game.dmgOrg(a, stuckA, 'atk'); atkDmg += stuckA; if (a.org <= 0) { out.deadUnits.push(a); out.events.push({ t: 'destroy', unit: a }); } }
       }
     }
 
@@ -331,5 +346,5 @@ globalThis.Combat = (function () {
     return opts[0];
   }
 
-  return { oddsKey, preview, resolve, retreatHex, shiftKey, capAttack, hasAntiArmor, softVsArmor, scaleDefDamage, supplyMod, passiveState, moraleRoll , traitMods };
+  return { oddsKey, preview, resolve, retreatHex, shiftKey, capAttack, hasAntiArmor, softVsArmor, scaleDefDamage, supplyMod, passiveState, moraleRoll , traitMods, setFrontage, getFrontage };
 })();

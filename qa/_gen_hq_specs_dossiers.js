@@ -3,8 +3,6 @@
  * intro 原则：编制职能 + 有把握的史实指挥官，不确定的人名不写。
  * 可重跑覆盖。 */
 const fs = require('fs');
-const path = require('path');
-const ROOT = path.join(__dirname, '..');
 
 const HQ = [
   // —— 德军（14）——
@@ -110,7 +108,7 @@ ${body}
 if (typeof module !== 'undefined' && module.exports) { module.exports = ${varName}; }
 else { (globalThis.__DOSSIER_SHARDS = globalThis.__DOSSIER_SHARDS || []).push(...${varName}); }
 `;
-  fs.writeFileSync(path.join(ROOT, 'js', file), out, 'utf8');
+  fs.writeFileSync('D:/ardennes-big/js/' + file, out, 'utf8');
   console.log('生成', file, rows.length, '条');
 };
 

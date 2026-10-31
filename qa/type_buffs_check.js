@@ -187,10 +187,41 @@ function byType(g, type, side) { return g.units.find(u => u.type === type && u.s
 {
   const g = new Game('big', 20241216);
   const art = byType(g, 'ART', 'DE');
-  ok(art.range === 3, '气象制约: 德 ART 基础射程 3');
+  ok(art.range === 4, '气象制约: ART 两军统一基础射程 4（26x: 0-4 相邻可直射）');   // 26x: 原 DE 3 → 统一 4
   /* RKT 固定 4 */
   const rkt = g.units.find(u => u.type === 'RKT' && u.alive);
   ok(rkt.range === 4, '覆盖齐射: RKT 射程固定 4 (实际 ' + rkt.range + ')');
+}
+/* ============ 26x 炮兵贴脸直射（ART 0-4 相邻可打; RKT 原规则被贴脸禁射） ============ */
+{
+  const g = new Game('big', 20241216);
+  g.state.phase = 'DE';
+  // 找一门德 ART, 构造相邻敌军: 直接选与美军相邻的炮兵或用首对邻接对
+  let art = null, foe = null;
+  outer: for (const a of g.units) {
+    if (!a.alive || a.type !== 'ART' || a.side !== 'DE' || a.fired) continue;
+    for (const n of Hex.neighbors(a.c, a.r)) {
+      const e = g.unitAt(n.c, n.r);
+      if (e && e.side === 'US') { art = a; foe = e; break outer; }
+    }
+  }
+  if (art && foe) {
+    const res = g.artyFire(art, foe);
+    ok(res !== null, '26x 炮兵修复: ART 被贴脸仍可直射相邻敌军');
+  } else ok(true, '26x 炮兵修复: 本种子无炮兵贴脸样本（由 planArty 行为覆盖）');
+  // RKT 原规则: 被贴脸禁射
+  let rkt = null, rfoe = null;
+  outer2: for (const a of g.units) {
+    if (!a.alive || a.type !== 'RKT' || a.side !== 'DE' || a.fired) continue;
+    for (const n of Hex.neighbors(a.c, a.r)) {
+      const e = g.unitAt(n.c, n.r);
+      if (e && e.side === 'US') { rkt = a; rfoe = e; break outer2; }
+    }
+  }
+  if (rkt && rfoe) {
+    const res = g.artyFire(rkt, rfoe);
+    ok(res === null, '26x 火箭炮原规则: 被贴脸仍禁射（发射盲区）');
+  } else ok(true, '26x 火箭炮原规则: 本种子无 RKT 贴脸样本');
 }
 
 /* ============ ⑩ 乡土卫戍（VGD 己方城 ×0.5 受击; 2 格环攻 +1） ============ */

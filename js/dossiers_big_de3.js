@@ -38,7 +38,7 @@ const SHARD_DE3 = [
     strength: '装甲营（缴获美军坦克/仿制谢尔曼）、装甲掷弹兵营×2、身穿美军制服的英语士兵分队',
     histDate: '1944-12-16（开局在场）',
     intro: '斯科尔兹尼指挥的特务部队，任务是在美军后方制造混乱、抢占马斯河桥。因仿制谢尔曼数量远少于计划，实际仅以小队渗透活动，12月下旬在马尔梅迪以南的试探被识破后解散为普通步兵旅。',
-    photo: 'https://upload.wikimedia.org/wikipedia/commons/e/e2/Captured_German_Panther_tank_crewman_1944.jpg' },
+    photo: '' },
 
   /* —— 美军：第8军（北肩+中路，开局在场主力）—— */
   { key: 'us_99id', side: 'US', branch: '美军', open: true,
@@ -48,7 +48,7 @@ const SHARD_DE3 = [
     strength: '第393/394/395步兵团、师属炮兵、歼击/工兵营',
     histDate: '1944-12-16（开局在场）',
     intro: '1944年11月才首次参战的新兵师，却打出了整个战役最关键的一仗：第394团在洛斯海姆缺口、第393/395团在埃尔森博恩 Ridge 死守，硬生生挡住党卫军第12装甲师与第3伞兵师三天，为援军争取了宝贵时间。全师伤亡惨重但防区从未真正崩塌。',
-    photo: 'https://upload.wikimedia.org/wikipedia/commons/7/78/99th_Infantry_Division_Moving_Through_Wirtzfeld.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original' },
+    photo: 'embed:ph26u' },
 
   { key: 'us_2id', side: 'US', branch: '美军', open: true,
     match: ['第2步兵师'],
@@ -75,7 +75,7 @@ const SHARD_DE3 = [
     strength: '第2/3/14坦克营、第27/52/60装甲步兵营、第9装A（RCCA/CCB/CCR战斗群）',
     histDate: '1944-12-16（开局在场）',
     intro: '分散配属的第9装R各战斗群首日就被冲散：CCR在圣维特血战，CCB守卫乌尔河桥与维尔茨，CCA后撤整补。残部在圣维特与巴斯托涅之间打满全场；一支部队后来在雷马根抢占鲁登道夫大桥（1945年3月，美军的意外大胜）。',
-    photo: 'https://upload.wikimedia.org/wikipedia/commons/8/87/SC_411804_-_Members_of_the_9th_Armored_Division%2C_3rd_U.S._Army_looking_at_a_sign_about_the_Russian_army._25_February%2C_1945._Sprimont%2C_Belgium._%2849537747038%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original' },
+    photo: 'embed:ph26u' },
 
   { key: 'us_28id', side: 'US', branch: '美军', open: true,
     match: ['第28步兵师'],
@@ -84,7 +84,7 @@ const SHARD_DE3 = [
     strength: '第109/110/112步兵团、师属炮兵、歼击/工兵营',
     histDate: '1944-12-16（开局在场）',
     intro: '许特根森林战役后正在乌尔河一线休整的"受创之师"，恰好处在德军中路主攻的正面上。首日防线被第2装甲师与装甲教导师撕碎，第110团几乎全军覆灭掩护了全师撤退；残部与第9装R战斗群一起在维尔茨死守，师长卡法少将后被德军俘虏。',
-    photo: 'https://upload.wikimedia.org/wikipedia/commons/e/e5/Photograph_of_Infantrymen_Passing_through_Witte%2C_Luxemburg_-_NARA_-_6928082.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original' },
+    photo: 'embed:ph26u' },
 
   { key: 'us_4id', side: 'US', branch: '美军', open: true,
     match: ['第4步兵师'],
@@ -93,7 +93,7 @@ const SHARD_DE3 = [
     strength: '第8/12/22步兵团、师属炮兵、歼击/工兵营',
     histDate: '1944-12-16（开局在场）',
     intro: '独撑整个南肩：在埃希特纳赫-埃希特河一线，以一师之力挡住第7集团军三个师的猛攻近一周，为巴顿第三集团军北调争取了时间。巴斯托涅解围的南部屏障。',
-    photo: 'https://upload.wikimedia.org/wikipedia/commons/9/9c/SC_329944_-_Troops_of_the_12th_Inf._Regt.%2C_4th_Inf._Div._crossing_from_France_into_Belgium%2C_are_able_to_bypass_a_bridge_to_which_the_retreating_Germans_have_set_fire_and_use_instead_a_bridge_erected_by_American_engineers_%2852594207855%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original' },
+    photo: 'embed:ph26u' },
 
   { key: 'us_8corps', side: 'US', branch: '美军', open: true,
     match: ['美军第8军'],

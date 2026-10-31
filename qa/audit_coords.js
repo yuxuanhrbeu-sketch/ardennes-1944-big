@@ -2,7 +2,7 @@
 /* 审计：城镇列坐标是否真的等于其真实经度的换算值（发现离群者） */
 const fs = require('fs');
 const path = require('path');
-const ROOT = path.join(__dirname, '..');
+const ROOT = 'D:/ardennes-big';
 for (const f of ['hex.js', 'data.js', 'data_big_oob.js', 'data_big.js']) {
   eval(fs.readFileSync(path.join(ROOT, 'js', f), 'utf8'));
 }

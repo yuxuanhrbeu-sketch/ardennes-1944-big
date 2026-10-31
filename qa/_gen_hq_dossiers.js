@@ -9,10 +9,8 @@
  * 本脚本可重跑：直接覆盖三个产出文件。
  * ============================================================ */
 const fs = require('fs');
-const path = require('path');
-const ROOT = path.join(__dirname, '..');
 for (const f of ['hex.js', 'data.js', 'data_big_oob.js', 'data_big.js']) {
-  eval(fs.readFileSync(path.join(ROOT, 'js', f), 'utf8'));
+  eval(fs.readFileSync('D:/ardennes-big/js/' + f, 'utf8'));
 }
 const B = globalThis.DATA_BIG;
 const M = B.OOB_BIG_META;
@@ -102,7 +100,7 @@ const HQ_RE = /^军直属$|^集团军直属$|^第7集团军(（南翼）)?直属
 /* 已有独立档案（us_526aib 等）的营不重复生成：现存档案 match 精确命中其 dispName */
 const existingExact = new Set();
 for (const shard of ['de1', 'de2', 'de3', 'us1', 'us2', 'uk']) {
-  for (const d of require(path.join(ROOT, 'js', 'dossiers_big_' + shard + '.js'))) {
+  for (const d of require('D:/ardennes-big/js/dossiers_big_' + shard + '.js')) {
     for (const k of d.match) existingExact.add(k);
   }
 }
@@ -156,7 +154,7 @@ else { (globalThis.__DOSSIER_SHARDS = globalThis.__DOSSIER_SHARDS || []).push(..
 const emit = (file, title, desc, rows) => {
   const varName = 'SHARD_' + file.match(/dossiers_big_(\w+)\.js/)[1].toUpperCase();
   const body = rows.map(d => '  ' + JSON.stringify(d) + ',').join('\n');
-  fs.writeFileSync(path.join(ROOT, 'js', file), header(title, desc, varName) + '\n' + body + '\n' + footer(varName), 'utf8');
+  fs.writeFileSync('D:/ardennes-big/js/' + file, header(title, desc, varName) + '\n' + body + '\n' + footer(varName), 'utf8');
   console.log('生成', file, rows.length, '条 (' + varName + ')');
 };
 

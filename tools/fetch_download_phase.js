@@ -4,7 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-const ROOT = path.join(__dirname, '..');
+const ROOT = 'D:/ardennes-big';
 const OUT = path.join(ROOT, 'vendor', 'photos', 'bulk');
 const PROXY = 'http://127.0.0.1:7890';
 const sleep = ms => execSync(`sleep ${ms / 1000}`);

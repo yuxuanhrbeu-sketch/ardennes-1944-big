@@ -182,7 +182,7 @@ globalThis.Game = (function () {
         moved: false, attacked: false, fired: false,
         supplied: true, unsupRounds: 0, arrive: o.arrive || 0,
         homeR: o.homeR !== undefined ? o.homeR : o.r,
-        isHQ: !!t.hq, range: o.type === 'RKT' ? DATA.TRAIT_KNOBS.RKT_RANGE : (o.type === 'ART' ? (o.side === 'US' ? 4 : 3) : (t.range || 0)),   // 覆盖齐射(24h): 火箭炮固定射程4
+        isHQ: !!t.hq, range: o.type === 'RKT' ? DATA.TRAIT_KNOBS.RKT_RANGE : (o.type === 'ART' ? 4 : (t.range || 0)),   // 26x: ART 两军统一射程 4(0-4, 相邻可直射); 火箭炮固定射程4(24h)
         // 炮兵支援力=编制攻值(美7/德5, 见规则弹窗与 §7.5); 曾误取 TYPES.support(=1), 导致炮兵
         // 远程射击战力比恒低于 1:4 而永远"未命中"、支援友邻只加 1 点 —— 2026-10 修正
         sup: o.type === 'ART' || o.type === 'RKT' ? o.atk : (t.support || 0),
@@ -247,7 +247,8 @@ globalThis.Game = (function () {
       if (u.isHQ && !u.hqShockDone && DATA.OOB_BIG_META && DATA.OOB_BIG_META[u.id]) {
         u.hqShockDone = true;
         const m = DATA.OOB_BIG_META[u.id];
-        const tier = u.type === 'HQT' ? 4 : u.type === 'HQA' ? 3 : 2;
+        /* 26k: 冲击值按伤害倍率换算（师级 ×2.5 → 总部 −10，营级仍 −4） */
+        const tier = Math.round((u.type === 'HQT' ? 4 : u.type === 'HQA' ? 3 : 2) * (DATA.DMG_SCALE || 1));
         const scope = this.units.filter(x => {
           if (!x.alive || x.exited) return false;
           const xm = DATA.OOB_BIG_META[x.id];
@@ -564,7 +565,7 @@ globalThis.Game = (function () {
         if (!u.alive || u.side !== side || u.type !== 'ART' && u.type !== 'RKT' || u.fired || u.moved) continue;
         let rng = u.range;
         if (this.state.weather === 'fog') rng -= 1;
-        if (this.inZOC(u.c, u.r, side)) continue; // 被贴脸的炮兵不能开火
+        if (u.type === 'RKT' && this.inZOC(u.c, u.r, side)) continue; // 26x: 仅火箭炮被贴脸禁射(原规则); ART 相邻可直射/支援
         if (Hex.distance(u.c, u.r, defUnit.c, defUnit.r) <= rng) out.push(u);
       }
       return out;
@@ -671,7 +672,9 @@ globalThis.Game = (function () {
     artyFire(artyUnit, targetUnit) {
       const isRKT = artyUnit.type === 'RKT';
       if (!artyUnit.alive || (artyUnit.type !== 'ART' && !isRKT) || artyUnit.fired || artyUnit.moved) return null;
-      if (this.inZOC(artyUnit.c, artyUnit.r, artyUnit.side)) return null;
+      /* 26x: 炮兵特性修复——ART 攻击距离 0-4, 相邻敌军也可直射(贴脸不再禁射);
+         RKT 仍按原规则(2-4 盲区 + 被贴脸不能开火 + 不受雾影响)。 */
+      if (isRKT && this.inZOC(artyUnit.c, artyUnit.r, artyUnit.side)) return null;
       const K = DATA.TRAIT_KNOBS;
       // 覆盖齐射(2026-10-24h): 火箭炮射程固定 2-4(相邻为发射盲区), 不受雾影响(面压制不依赖精确观测)
       let rng = isRKT ? K.RKT_RANGE : (artyUnit.range - (this.state.weather === 'fog' ? 1 : 0));
@@ -981,17 +984,40 @@ globalThis.Game = (function () {
       return true;
     }
 
+    /* 27f: 孤城判定——城镇周边 3 格内敌军战力(攻+防) > 己方战力 × 3 → 视为被围死,
+       不再作为补给源（歼灭模式专用）。驻城残兵断补 → 组织度衰减 → 围城可速决。 */
+    _townOverrun(sc, side) {
+      let mine = 0, foe = 0;
+      const foeSide = side === 'DE' ? 'US' : 'DE';
+      for (const u of this.units) {
+        if (!u.alive || u.exited) continue;
+        if (Hex.distance(u.c, u.r, sc.c, sc.r) > 3) continue;
+        const pow = (u.atk + u.def) * (u.org / Math.max(u.maxOrg, 1));   // 27f 修正: 有效战力（按组织度折算）——纸面战力会让残兵永远"未被围死"
+        if (u.side === side) mine += pow;
+        else if (u.side === foeSide) foe += pow;
+      }
+      return foe > mine * 3;
+    }
+
     // 某一方的全部有效补给源（城镇 + 指挥部）
     supplySources(side) {
+      if (DATA.SUPPLY_DISABLED) return [];   // 26g: 师级无补给源
       const out = [];
+      /* 27f 歼灭残局孤城断供: 歼灭模式下, 被敌军重兵围死（周边 3 格敌战力 > 己方 3 倍）
+         的城镇不再是补给源——残兵缩进孤城每回合满编整补, 攻击永远打不死（实测
+         19 个残兵磨了 16 个回合）。常规对局不受影响（零回归风险）。 */
+      const enclave = this.noTurnLimit;
       for (const t of this.map.towns) {
         if (!t.supply || t.ctrl !== side) continue;
         const sc = { c: t.c, r: t.r, name: t.name, tier: t.tier, kind: 'town', range: t.range, side: t.ctrl };
+        if (enclave && this._townOverrun(sc, side)) continue;
         if (this._sourceUsable(sc, side)) out.push(sc);
       }
       for (const u of this.units) {
         if (u.alive && !u.exited && u.side === side && u.isHQ) {
           const sc = { c: u.c, r: u.r, name: u.name, tier: 2, kind: 'hq', range: DATA.SUPPLY_R_HQ * 4, side };
+          /* 27f: 指挥部源同样受孤城断供约束——残局口袋靠自己的指挥部满编整补, 永远打不死 */
+          if (enclave && this._townOverrun(sc, side)) continue;
           if (this._sourceUsable(sc, side)) out.push(sc);
         }
       }
@@ -1010,6 +1036,7 @@ globalThis.Game = (function () {
     // 这种假象（2026-10-12 实测：埃希特纳赫的纯距离覆盖里混进 92 个德军营）。
     // 显示层与 _supply() 用同一套规则，避免"显示得很大、实际供不到"。
     townCoverage(c, r, side) {
+      if (DATA.SUPPLY_DISABLED) return null;   // 26g: 师级不展示补给覆盖
       const t = this.map.towns.find(x => x.c === c && x.r === r);
       if (!t || !t.supply) return null;
       const sd = side || t.ctrl;
@@ -1027,6 +1054,13 @@ globalThis.Game = (function () {
     }
 
     _supply(side) {
+      /* 26g: 师级剧本取消补给机制——所有单位恒有补给（整补/断补判定全部跳过） */
+      if (DATA.SUPPLY_DISABLED) {
+        for (const u of this.units) {
+          if (u.side === side && u.alive && !u.exited) { u.supplied = true; u.unsupRounds = 0; }
+        }
+        return;
+      }
       const reach = new Set();
       // 敌占格集合（扩散不得穿越）
       const enemy = this.enemyOf(side);
@@ -1080,10 +1114,11 @@ globalThis.Game = (function () {
         if (u.supplied) {
           const hex = this.hexAt(u.c, u.r);
           const inTown = hex.town && hex.town.ctrl === side;
-          u.org = Math.min(u.maxOrg, u.org + (inTown ? 3 : 2));
+          const rec = Math.max(1, Math.round((inTown ? 3 : 2) * (DATA.RECOVER_SCALE || 1)));   // 26k: 整补同比放大
+          u.org = Math.min(u.maxOrg, u.org + rec);
         } else if (!this.supplyExempt(u) && u.unsupRounds > DATA.UNSUP_GRACE) {
           // 断补组织度损耗: 宽限期(前两回合)不损耗, 第 3 回合起每阶段 -1(现行设定生效时点后移)
-          this.dmgOrg(u, 1, 'other');
+          this.dmgOrg(u, Math.max(1, Math.round(1 * (DATA.DMG_SCALE || 1))), 'other');   // 26k: 断补损耗同比
           this._cas(side, 1);
           if (u.org <= 0) {
             u.alive = false; this._removeUnit(u);
@@ -1154,6 +1189,28 @@ globalThis.Game = (function () {
         }
         this.state.round++;
         this.state.phase = 'DE';
+        /* 26y 僵持保险丝（仅歼灭模式）: 连续 STALL_ROUNDS 个回合「双方存活数 + 累计伤亡」完全不变
+           → 战场已无有效交战（残兵互不可及/只剩无法互攻的单位）, 按剩余建制判胜者并终局。
+           这是最后一道保险: AI 猎杀逻辑（26y allOut 全军扑残敌）已消除绝大多数僵持,
+           保险丝只在物理上真的打不到时兜底, 10 回合内不会有任何正常对局被它结束。 */
+        if (this.noTurnLimit) {
+          /* 27f 硬化: 签名只看双方存活数——炮兵/空袭的零星掉血不再重置保险丝,
+             真正的"部队够不着"僵持 10 回合内必触发 */
+          const sig = this._aliveCount('DE') + '|' + this._aliveCount('US');
+          if (this.state._stallSig === sig) this.state._stallRounds = (this.state._stallRounds || 0) + 1;
+          else { this.state._stallSig = sig; this.state._stallRounds = 0; }
+          if (this.state._stallRounds >= 10) {
+            const deL = this._remaining('DE'), usL = this._remaining('US');
+            this.state.over = true;
+            this.state.winner = deL > usL ? 'DE' : 'US';
+            this.state.victoryKey = deL > usL ? 'DE_tactical' : 'US_win';
+            this.state.endText = `战场陷入僵持已 ${this.state._stallRounds} 个回合（双方均无有效交战、无战损）。` +
+              `按剩余建制裁定：德军剩 ${deL}，美军剩 ${usL}，` +
+              (deL > usL ? '德军' : '美军') + '判定为推演胜方。';
+            this.log(`◆ 僵持终止（连续 ${this.state._stallRounds} 回合零战果）——按剩余建制裁定`, 'sys');
+            this.emit('over'); this.emit('state'); return;
+          }
+        }
         if (!this.noTurnLimit && this.state.round > this.scenario.rounds) {
           this._finalVerdict();
           this.emit('over'); this.emit('state');
@@ -1245,7 +1302,8 @@ globalThis.Game = (function () {
       const usLoss = this._lossPct('US');
       if (!this.scenario.campaign) {
         const obj = (st.exits >= 1 ? 1 : 0) + (holdsStV ? 1 : 0) + (holdsBast ? 1 : 0);
-        if (st.exits >= DATA.EXITS_NEEDED) {
+        const exitsNeed = this.scenario.exitsNeeded || DATA.EXITS_NEEDED;   // 25d: 攻势剧本可自带门槛
+        if (st.exits >= exitsNeed) {
           st.over = true; st.winner = 'DE';
           st.endText = `德军决定性胜利！${st.exits}个装甲战斗群冲过马斯河，通往安特卫普的大门洞开。`;
           st.victoryKey = 'DE_decisive';
@@ -1305,6 +1363,16 @@ globalThis.Game = (function () {
           attach: { at: !!u.attach.at, fort: !!u.attach.fort, repl: !!u.attach.repl, aa: !!u.attach.aa },
         })),
       };
+    }
+    /* 25a 撤子: 快照/恢复（复用存档序列化, 同一局内回滚单步玩家操作） */
+    snapshotJson() { return JSON.stringify(this.serialize()); }
+    restoreJson(json) {
+      /* 25a: _load 假定空容器(仅构造时调用); 撤子是同局中途回滚, 必须先清空
+         units/grid, 否则新旧两套算子叠加、uid 撞车(曾致恢复后位置不回滚) */
+      this.units = [];
+      this.grid.clear();
+      this._zocDirty();
+      this._load(JSON.parse(json));
     }
     _load(s) {
       // 恢复状态

@@ -6,11 +6,11 @@ const SHARD_DE2 = [
   { key: 'de_panzerlehr', side: 'DE', branch: '国防军', open: true,
     match: ['装甲教导师'],
     name: '装甲教导师（Panzer-Lehr-Division）',
-    type: '装甲师（国防军精锐）',
+    type: '装甲师（国防军直属）',
     strength: '第130装甲掷弹兵团×2、第130装甲教导团（豹式/IV号）、第130炮兵团、侦察/歼击/工兵营',
     histDate: '1944-12-16（开局在场）',
-    intro: '德军装备最豪华的装甲师（坦克/突击炮约120辆，半数豹式），诺曼底战役损耗近半后在德国本土以最强补充重建。阿登战役中作为第5装甲集团军右翼主力，沿乌尔河谷向巴斯托涅方向进攻，12月下旬在围绕该城的血战中损失大量装甲，1945年1月撤出。',
-    photo: 'https://upload.wikimedia.org/wikipedia/commons/7/77/Bundesarchiv_Bild_101I-738-0273-01A%2C_Villers-Bocage%2C_zerst%C3%B6rter_Panzer_IV.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original' },
+    intro: '德军装备较好的装甲师（坦克/突击炮约120辆，半数豹式），诺曼底战役损耗近半后在德国本土优先补充重建。阿登战役中作为第5装甲集团军右翼主力，沿乌尔河谷向巴斯托涅方向进攻，12月下旬在围绕该城的血战中损失大量装甲，1945年1月撤出。',
+    photo: 'embed:ph26u' },
 
   { key: 'de_2pzd', side: 'DE', branch: '国防军', open: true,
     match: ['第2装甲师'],
@@ -28,7 +28,7 @@ const SHARD_DE2 = [
     strength: '第60/156装甲掷弹兵团、第16装甲团、第146炮兵团、侦察/歼击/工兵营',
     histDate: '1944-12-16（开局在场）',
     intro: '因师徽灵缇犬得名，擅长机动作战。阿登战役中作为中路左翼向乌法利兹-豪法利兹方向推进，12月下旬在奥特河一线与美军第7装甲师和英军部队遭遇，1月初随整个攻势的崩解撤回出发地域。',
-    photo: 'https://upload.wikimedia.org/wikipedia/commons/c/cb/Hoeve_Mottet_in_Marenne_na_doorgang_van_116_Panzer_Divisie_1945_Ardennenoffensief.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original' },
+    photo: 'embed:ph26u' },
 
   { key: 'de_18vgd', side: 'DE', branch: '国民掷弹兵', open: true,
     match: ['第18国民掷弹兵师'],
@@ -85,12 +85,12 @@ const SHARD_DE2 = [
     photo: '' },
 
   { key: 'de_fgb', side: 'DE', branch: '国防军', open: true,
-    match: ['元首掷弹兵旅', '元首掷弹旅'],
-    name: '元首掷弹兵旅（Führer-Grenadier-Brigade）',
+    match: ['最高统帅部掷弹兵旅', '最高统帅部掷弹兵旅'],
+    name: '最高统帅部掷弹兵旅（Führer-Grenadier-Brigade）',
     type: '装甲掷弹兵旅（OKH预备队）',
     strength: '掷弹兵营×2、装甲营、突击炮连、炮兵/工兵分队（约1,800人）',
     histDate: '1944-12-16（开局在场）',
-    intro: '与元首卫队旅同源的"最高统帅部宝贝"部队，装备精良但缺乏实战经验。阿登战役中配属第5装甲集团军，12月下旬在乌尔河-巴斯托涅方向投入，表现平平，1945年1月转用于东线。',
+    intro: '与最高统帅部护卫旅同源的"最高统帅部宝贝"部队，装备精良但缺乏实战经验。阿登战役中配属第5装甲集团军，12月下旬在乌尔河-巴斯托涅方向投入，表现平平，1945年1月转用于东线。',
     photo: '' },
 
   { key: 'de_15pgd', side: 'DE', branch: '国防军', open: true,
@@ -109,7 +109,7 @@ const SHARD_DE2 = [
     strength: '第8/29装甲掷弹兵团、第103装甲营、第3炮兵团、侦察/歼击/工兵营',
     histDate: '1944-12-16（开局在场）',
     intro: '从意大利战线调来的老牌机械化师。阿登战役中作为第5装甲集团军预备队，12月下旬投入乌尔河-克莱沃方向，与美军第28师和第9装R战斗群反复拉锯，1945年1月撤出。',
-    photo: 'https://upload.wikimedia.org/wikipedia/commons/6/61/GERMAN_TROOPS_ADVANCING_PAST_ABANDONED_AMERICAN_EQUIPMENT.jpg' },
+    photo: '' },
 
   { key: 'de_9pzd', side: 'DE', branch: '国防军', open: true,
     match: ['第9装甲师'],
@@ -118,7 +118,7 @@ const SHARD_DE2 = [
     strength: '第10/11装甲掷弹兵团、第33装甲团、第102炮兵团、侦察/歼击/工兵营',
     histDate: '1944-12-16（开局在场）',
     intro: '从亚琛撤下的老牌装甲师。阿登战役中作为第5装甲集团军南翼的机动预备队，负责掩护中路与南翼的结合部，12月下旬在乌法利兹以南投入反击，1月初随全线东撤。',
-    photo: 'https://upload.wikimedia.org/wikipedia/commons/5/59/Duitse_Panzerkampfwagen_IV%2C_Ausf%C3%BChrung_D%2C_van_9._Panzerdivision_tijdens_de_opmars_in_mei_1940_2000-336-001.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original' },
+    photo: 'embed:ph26u' },
 
   { key: 'de_7vwf', side: 'DE', branch: '国民掷弹兵', open: true,
     match: ['第7国民火箭炮旅'],
@@ -220,13 +220,13 @@ const SHARD_DE2 = [
     photo: '' },
 
   { key: 'de_fgw_reinf', side: 'DE', branch: '国防军', open: false,
-    match: ['元首卫队旅', '元首护卫旅'],
-    name: '元首卫队旅（Führer-Begleit-Brigade）',
+    match: ['最高统帅部护卫旅', '最高统帅部护卫旅'],
+    name: '最高统帅部护卫旅（Führer-Begleit-Brigade）',
     type: '装甲掷弹兵旅（OKH预备队）',
     strength: '掷弹兵营×2、装甲营、突击炮连、炮兵/工兵分队',
     histDate: '1944-12-24（增援）',
-    intro: '元首卫队旅与元首掷弹兵旅同源，是最高统帅部直接掌握的精锐预备队。阿登战役中于12月24日起投入圣维特以西方向，试图从北面合围巴斯托涅，但在美军第7装甲师与第82空降师的防线上进展甚微，反而损耗了宝贵的装甲力量。',
-    photo: 'https://upload.wikimedia.org/wikipedia/commons/a/ad/German_Tiger_II_tank_passes_American_prisoners%2C_16_December_1944_%28111-SC-198241%29.jpg' },
+    intro: '最高统帅部护卫旅与最高统帅部掷弹兵旅同源，是最高统帅部直接掌握的预备队。阿登战役中于12月24日起投入圣维特以西方向，试图从北面合围巴斯托涅，但在美军第7装甲师与第82空降师的防线上进展甚微，反而损耗了宝贵的装甲力量。',
+    photo: '' },
 ];
 
 /* 浏览器 <script> 直载兼容：node 走 module.exports，浏览器推入分片汇合点 */

@@ -596,6 +596,62 @@
     #modal .tabs button { padding: 7px 12px; font-size: 12px; }
   }
 
+/* ============================================================
+   25b 顶栏重构（自大阿登移植）：分组分隔 / 图标前缀 / 主次分级 / 自适应换行
+   ============================================================ */
+#topbar { min-height: 54px; height: auto; flex-wrap: wrap; row-gap: 6px; padding: 8px 16px; }
+#topStats { min-width: 0; overflow-x: auto; scrollbar-width: none; }
+#topStats::-webkit-scrollbar { height: 0; }
+.tb-sep { width: 1px; height: 22px; background: var(--edge); margin: 0 7px; flex: none; }
+#topBtns button {
+  padding: 6px 12px; border-radius: 6px; white-space: nowrap; font-size: 12.5px;
+  background: linear-gradient(180deg, #2e353d, #232a31); border: 1px solid var(--edge);
+}
+#topBtns button:hover { background: #3d4650; border-color: #6a7683; }
+#btnEnd {
+  background: linear-gradient(180deg, #8a6a24, #6e521c); border-color: #c9a227;
+  font-weight: 700; letter-spacing: 1px; padding: 6px 16px;
+}
+#btnEnd::before { content: '\25B5\00A0'; font-size: 10px; }
+#btnEnd:hover { background: #a3812e; border-color: #e6c85c; }
+#btnOOB::before { content: '\25A4\00A0'; }
+#btnAchv::before { content: '\2726\00A0'; color: #e6c85c; }
+#btnRules::before { content: '?\00A0'; color: #9aa39a; }
+#btnToggles::before { content: '\2699\00A0'; }
+#btnAI { border-color: #55612e; }
+#btnAI::before { content: '\2694\00A0'; color: #b8c4b0; }
+#btnUndo::before { content: '\21B6\00A0'; }
+#btnUndo:disabled { opacity: 0.4; cursor: default; }
+#btnPause { min-width: 74px; text-align: center; }
+#btnAIde, #btnAIus { min-width: 68px; text-align: center; }
+#btnRestart { border-color: #6e4038; }
+#btnRestart:hover { background: #4a2b26; border-color: #9a5a4e; }
+/* 25b AI 指挥面板（军事风） */
+.aim-sec { margin: 14px 0; }
+.aim-row { display: flex; align-items: center; gap: 14px; padding: 11px 4px; border-bottom: 1px solid var(--hair); }
+.aim-row:last-child { border-bottom: none; }
+.aim-t { font-family: var(--disp); font-size: 14.5px; letter-spacing: 1px; color: #f0ead6; }
+.aim-d { font-size: 11.5px; color: #8f968f; margin-top: 3px; line-height: 1.5; }
+.aim-row > div:first-child { flex: 1; }
+.aim-sw { min-width: 74px; min-height: 34px; border-radius: 6px; font-weight: 700; }
+.aim-sw.on { background: #55612e; border-color: #7d9140; color: #e8e4d8; }
+.aim-speeds { display: flex; gap: 10px; margin-top: 9px; flex-wrap: wrap; }
+.aim-pc { flex: 1; min-width: 140px; text-align: left; padding: 10px 12px; border-radius: 6px;
+  background: #1c2127; border: 1px solid var(--hair); cursor: pointer; color: #cfd3c8; }
+.aim-pc b { display: block; font-size: 13px; letter-spacing: 1px; margin-bottom: 3px; }
+.aim-pc span { font-size: 11px; color: #8f968f; line-height: 1.4; }
+.aim-pc.on { border-color: #c9a227; background: rgba(230, 200, 92, 0.07); }
+.aim-pc.on b { color: #e6c85c; }
+/* 25b 开关浮层 */
+#swPop {
+  position: fixed; z-index: 45; width: 220px; padding: 10px 12px;
+  background: rgba(14, 17, 21, 0.97); border: 1px solid var(--edge); border-radius: 8px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5);
+}
+.sw-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+.sw-k { flex: 1; font-size: 12.5px; color: #cfd3c8; letter-spacing: 1px; }
+.sw-btn { min-width: 64px; text-align: center; min-height: 30px; }
+
 </style>
 </head>
 <body>
@@ -619,15 +675,18 @@
     <span class="grow"></span>
     <button id="btnMenu" title="展开/收起菜单" aria-label="菜单">☰</button>
     <div id="topBtns">
-      <button id="btnEnd" class="primary">结束阶段</button>
-      <button id="btnAIde">德军AI</button>
-      <button id="btnAIus">美军AI</button>
+      <button id="btnEnd" class="primary" title="结束当前阶段">结束阶段</button>
+      <button id="btnUndo" title="撤子：仅可撤回你最近的一手（移动/攻击/炮击/空袭/发放支援）。战损、令牌、城镇归属一并回滚，骰运重新掷取">撤子</button>
+      <button id="btnPause" title="暂停/继续：冻结 AI 推演与操作（AI 当前阶段跑完后停在你按下的时刻）">⏸ 暂停</button>
+      <span class="tb-sep" aria-hidden="true"></span>
+      <button id="btnAI" title="AI 指挥：德军/美军 AI 开关与行动速度">⚔ AI 指挥</button>
+      <span class="tb-sep" aria-hidden="true"></span>
       <button id="btnOOB" title="查看当前在场的双方部队，按攻击+防御之和由高到低排序；点击一行可在地图上定位">兵力一览</button>
-<button id="btnAchv" title="成就与战绩：勋章墙 / 最近 100 场 / 统计（也可导出战绩卡）">战绩</button>
+      <button id="btnAchv" title="成就与战绩：勋章墙 / 最近 100 场 / 统计（也可导出战绩卡）">战绩</button>
+      <span class="tb-sep" aria-hidden="true"></span>
       <button id="btnRules">规则</button>
-      <button id="btnSfx" title="音效开关（程序化合成，无外部音频文件）">音效 开</button>
-      <button id="btnAISpeed" title="AI 行动速度：标准 / 快速 / 极速（极速跳过移动动画，适合观摩整局；记忆偏好）">AI 快速</button>
-      <button id="btnRestart">重新开始</button>
+      <button id="btnToggles" title="音效 / 增援档案弹卡 开关">⚙ 开关</button>
+      <button id="btnRestart" title="放弃当前战局，回到剧本选择">重新开始</button>
     </div>
   </div>
 
@@ -1157,11 +1216,11 @@ globalThis.DATA = (function () {
     ['d39', '第212国民掷弹兵团·2团', '212VG2', 'VGD', 2, 3, 4, 39, 27, 0, 9],
     ['d40', '第276国民掷弹兵团', '276VG', 'VGD', 2, 3, 4, 39, 28, 0, 9],
     ['d41', '第276国民掷弹兵团·2团', '276VG2', 'VGD', 2, 3, 4, 38, 29, 0, 9],
-    ['d42', '元首卫队旅装甲营', 'FB装营', 'ARM', 8, 6, 7, 41, 20, 3, 10],
+    ['d42', '最高统帅部护卫旅装甲营', 'FB装营', 'ARM', 8, 6, 7, 41, 20, 3, 10],
     ['d43', '第7集团军炮兵营', '7集炮', 'ART', 5, 1, 3, 39, 24, 0, 10],
     ['d44', '第7集团军部', '7集司', 'HQ', 1, 3, 6, 40, 25, 0, 10],
     // ===== 全战役剧本后期增援 =====
-    ['d45', '元首掷弹旅装甲营', 'FG装营', 'ARM', 8, 6, 7, 45, 14, 14, 10],
+    ['d45', '最高统帅部掷弹兵旅装甲营', 'FG装营', 'ARM', 8, 6, 7, 45, 14, 14, 10],
     ['d46', '格奈森瑙步兵团', '格奈团', 'INF', 4, 4, 5, 45, 18, 16, 10],
     ['d47', '第9装甲营', '9装营', 'ARM', 8, 6, 7, 45, 22, 15, 10],
     // ===== 师属第二团/加强炮兵(史实编制补全) =====
@@ -1359,7 +1418,7 @@ globalThis.DATA = (function () {
   /* ---------------- 史实事件注记 ---------------- */
   const EVENTS = {
     1:  '12月16日 05:30，德军三个集团军在130公里正面发起总攻，美军第8军防区猝不及防，炮火映红了雪原。',
-    2:  '12月17日，派佩尔战斗群在马尔梅迪公路枪杀美军战俘；第106师两个团在雪艾菲尔山陷入重围；圣维特告急。',
+    2:  '12月17日，马尔梅迪事件发生；第106师两个团在雪艾菲尔山陷入重围；圣维特告急。',
     3:  '12月18日，第101空降师连夜卡车机动进驻巴斯托涅；第82空降师抢占维尔萨姆一线；派佩尔兵锋抵达斯塔沃洛。',
     4:  '12月19日，党卫军第12装甲师猛攻埃尔森博恩岭，被第2、99步兵师死死顶住；艾森豪威尔在凡尔登召开危机会议。',
     5:  '12月20日，巴斯托涅陷于合围；第1、第9集团军划归巴顿指挥；美第7装甲师在圣维特以东且战且退。',
@@ -1378,7 +1437,7 @@ globalThis.DATA = (function () {
     17: '1月2日，突出部内德军补给濒于断绝，公路被美机昼夜封锁。',
     18: '1月3日，美第1、第3集团军自南北两面对攻，阿登转入全面反攻。',
     19: '1月5日，德军防线处处告急，莫德尔请求后撤被拒。',
-    20: '1月8日，希特勒终于下令德军撤出突出部，为时已晚。',
+    20: '1月8日，德军最高统帅部终于下令撤出突出部，为时已晚。',
     21: '1月10日，美军多路追击，德军后卫依托河川逐次抵抗。',
     22: '1月12日，苏军发起维斯瓦河攻势，德军预备队被迫东调——西线的命运就此注定。',
     23: '1月15日，突出部内德军且战且退，桥梁一部被工兵炸毁。',
@@ -1451,14 +1510,15 @@ globalThis.DATA = (function () {
    * 覆盖 14 支代表性建制（美 9 / 德 5）——用户要求"主要史实部队"，非全 82 行增援。
    * ------------------------------------------------------------------- */
   const CDN_WM = 'https://upload.wikimedia.org/wikipedia/commons/';
+  const PH26U = 'data:image/jpeg;base64,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';   /* 26u: 照片统一占位图 */
   const REINFORCE_DOSSIERS = [
     {
       key: 'us7a', side: 'US', type: '装甲', match: ['第7装甲师'],
       name: '第7装甲师',
       strength: '第17/31/40坦克营、第23装甲步兵营 等',
       histDate: '1944-12-17',
-      photo: CDN_WM + '6/69/M4_Sherman_tanks_of_the_U.S._7th_Armored_Division_near_St._Vith%2C_Belgium%2C_24_January_1945_%28148727210%29.jpg',
-      photoCaption: '第7装甲师的 M4 谢尔曼坦克，圣维特附近（1945年1月）',
+      photo: PH26U,
+      photoCaption: '',
       intro: '第7装甲师自12月17日起陆续投入圣维特方向，与第106步兵师残部、第9装甲师一部编成临时"圣维特战斗群"。该师在圣维特周边反复阻击，为盟军向西集结争取时间，直至12月23日奉命放弃该城西撤。整个战役期间伤亡、被俘约三千余人。',
     },
     {
@@ -1466,8 +1526,8 @@ globalThis.DATA = (function () {
       name: '第101空降师「啸鹰」',
       strength: '第501/502/506伞兵团、第327滑翔步兵团、第321滑翔炮兵营',
       histDate: '1944-12-18',
-      photo: CDN_WM + 'd/d3/101st_Airborne_troops_move_out_of_Bastogne.jpg',
-      photoCaption: '第101空降师的士兵走出巴斯托涅（1945年1月）',
+      photo: PH26U,
+      photoCaption: '',
       intro: '12月18日，第101空降师奉命驰援巴斯托涅，19日凌晨抵达并接手该城防御。此后一周，该师在缺弹药、缺食物、缺御寒装备的情况下被德军合围，依托环形阵地坚守。12月22日德军劝降，代理师长麦考利夫准将回以一句"Nuts!"。12月26日第4装甲师先遣队突入该城，包围被打破——此役使第101空降师成为突出部战役的象征。',
     },
     {
@@ -1475,8 +1535,8 @@ globalThis.DATA = (function () {
       name: '第82空降师「全美」',
       strength: '第504/505/508伞兵团、第325滑翔步兵团',
       histDate: '1944-12-18',
-      photo: CDN_WM + 'a/a1/82nd_Airborne_drop_pattern%2C_D-Day%2C_6_June_1944.JPG',
-      photoCaption: '第82空降师在诺曼底实施伞降（1944年6月6日，资料照片）',
+      photo: PH26U,
+      photoCaption: '',
       intro: '12月18日，第82空降师在圣维特以北展开，接管萨尔姆河一线（所谓"北肩角"）的防御。12月20日圣维特失守后，该师退守昂布莱沃河与萨尔姆河之间，与第30步兵师一起顶住德军第6装甲集团军的突击；其滑翔步兵团于12月21日加入战斗。',
     },
     {
@@ -1484,8 +1544,8 @@ globalThis.DATA = (function () {
       name: '第10装甲师',
       strength: '第11/20坦克营、第20/23装甲步兵营 等',
       histDate: '1944-12-18',
-      photo: CDN_WM + '5/5d/U.S._10th_Armored_Division_troops_in_Bastogne%2C_Belgium%2C19_December_1944_%28148727462%29.jpg',
-      photoCaption: '第10装甲师部队在巴斯托涅（1944年12月19日）',
+      photo: PH26U,
+      photoCaption: '',
       intro: '12月18日，第10装甲师受命分成三个战斗群（Desobry、Cherry、O’Hara）驰援巴斯托涅方向。Desobry 战斗群先期抵达该城东北的 Noville，Cherry 战斗群守住东面的要道，为主力与第101空降师进城争取了宝贵时间。',
     },
     {
@@ -1493,8 +1553,8 @@ globalThis.DATA = (function () {
       name: '第1步兵师「大红一师」',
       strength: '第16/18/26步兵团',
       histDate: '1944-12-20',
-      photo: CDN_WM + '0/08/26th_Infantry_Regiment_near_Butgenbach.jpg',
-      photoCaption: '第1步兵师第26步兵团，比辰巴赫附近',
+      photo: PH26U,
+      photoCaption: '',
       intro: '第1步兵师于12月20日从亚琛方向赶到北翼，在比辰巴赫（Bütgenbach）以南接防，与第99步兵师共同守住突出部北肩。该师在1944年12月下旬至1945年1月间顶住德军多次强攻，是德军第6装甲集团军向西突破的最大障碍之一。',
     },
     {
@@ -1502,8 +1562,8 @@ globalThis.DATA = (function () {
       name: '第30步兵师「老希科利」',
       strength: '第117/119/120步兵团',
       histDate: '1944-12-21',
-      photo: CDN_WM + '6/63/M7_105-MM._SP_HOWITZER_OF_THE_30TH_DIVISION_IN_ACTION_near_la_Gleize.jpg',
-      photoCaption: '第30步兵师的 M7 105 毫米自行榴弹炮在拉格莱兹附近射击',
+      photo: PH26U,
+      photoCaption: '',
       intro: '第30步兵师于12月21日投入斯塔沃洛-马尔梅迪一线，与第82空降师协同封锁派佩尔战斗群（KG Peiper）向西北突进的道路。该师在斯塔沃洛、拉格莱兹（La Gleize）一带逐村争夺，最终配合友军把被围的德军装甲战斗群压缩，迫使其弃车徒步突围。',
     },
     {
@@ -1511,8 +1571,8 @@ globalThis.DATA = (function () {
       name: '第4装甲师',
       strength: '第8/35/37坦克营、第51装甲步兵营 等',
       histDate: '1944-12-22',
-      photo: CDN_WM + '8/8b/Photograph_of_Tanks_of_the_4th_Armored_Division_-_NARA_-_12010181.jpg',
-      photoCaption: '第4装甲师的坦克（美国国家档案馆 NARA 藏品）',
+      photo: PH26U,
+      photoCaption: '',
       intro: '应巴顿将军之命，第4装甲师于12月22日从南面发起解围行动，在冰雪与泥泞中一路北进。12月26日下午，该师第37坦克营的先遣队突入巴斯托涅，与第101空降师会合，打破了德军长达数日的包围——这是突出部战役中最著名的解围行动之一。',
     },
     {
@@ -1520,8 +1580,8 @@ globalThis.DATA = (function () {
       name: '第17空降师',
       strength: '第194/513/507伞兵团',
       histDate: '1944-12-25',
-      photo: CDN_WM + '3/34/SC_337213_-_Signalmen_of_the_17th_Airborne_Division_are_laying_wire_through_the_town_of_Marnach%2C_Luxembourg%2C_to_an_artillery_observation_post._%2852204180839%29.jpg',
-      photoCaption: '第17空降师通信兵在卢森堡马尔纳赫铺设电话线',
+      photo: PH26U,
+      photoCaption: '',
       intro: '第17空降师于1944年12月底至1945年1月初投入阿登战场，接管卢森堡马尔纳赫（Marnach）一带阵地，参与稳定南翼战线、支援巴斯托涅解围后的反攻。该师1944年8月才登陆欧洲，是盟军投入突出部战役的最年轻空降师之一。',
     },
     {
@@ -1529,8 +1589,8 @@ globalThis.DATA = (function () {
       name: '第3装甲师「矛头」',
       strength: '第32/33坦克营 等',
       histDate: '1944-12-24',
-      photo: CDN_WM + '8/84/USA_3070551_of_the_3rd_Armored_Division_in_Chenee%2C_Belgium%2C_September_8%2C_1944.jpg',
-      photoCaption: '第3装甲师的坦克，比利时谢内（1944年9月）',
+      photo: PH26U,
+      photoCaption: '',
       intro: '第3装甲师于1944年12月下旬投入阿登战场，编入第7军，参与北翼的反击与战线稳定，为后续向乌尔特河以东推进积蓄装甲力量。',
     },
     {
@@ -1538,8 +1598,8 @@ globalThis.DATA = (function () {
       name: '第506重装甲营（虎王）',
       strength: '虎王（Tiger II）重型坦克营',
       histDate: '1944-12-18',
-      photo: CDN_WM + '1/11/German_Tiger_II_tank_in_Stavelot%2C_Belgium%2C_21_December_1944_%28111-SC-198115%29.jpg',
-      photoCaption: '德军虎王坦克，比利时斯塔沃洛（1944年12月21日）',
+      photo: PH26U,
+      photoCaption: '',
       intro: '第506重装甲营装备"虎王"（Tiger II）重型坦克，1944年12月编入德军第6装甲集团军序列投入阿登攻势。虎王火力与装甲防护出众，但机动性差、油耗高，在阿登狭窄泥泞的道路与承重不足的桥梁前反受掣肘，在斯塔沃洛、拉格莱兹等地与盟军展开激烈巷战。',
     },
     {
@@ -1547,36 +1607,36 @@ globalThis.DATA = (function () {
       name: '党卫军第2装甲师「帝国」',
       strength: '党卫军第2装甲团、党卫军第2装甲掷弹兵团、党卫军第2装甲炮兵营 等',
       histDate: '1944-12-23',
-      photo: CDN_WM + 'e/e2/MortainDasReich.jpg',
-      photoCaption: '"帝国"师在莫尔坦反攻中（1944年8月，诺曼底）',
-      intro: '党卫军第2装甲师"帝国"（Das Reich）于1944年12月下旬调来西线，编入德军第7集团军，参与南翼对巴斯托涅的攻势以及对盟军反攻的抗击。该师此前曾在诺曼底的"莫尔坦"反攻中重创美军，是德军最精锐的装甲部队之一。',
+      photo: PH26U,
+      photoCaption: '',
+      intro: '党卫军第2装甲师"帝国"（Das Reich）于1944年12月下旬调来西线，编入德军第7集团军，参与南翼对巴斯托涅的攻势以及对盟军反攻的抗击。该师此前曾在诺曼底的"莫尔坦"反攻中重创美军，是德军装备较好的装甲部队之一。',
     },
     {
-      key: 'de_fbb', side: 'DE', type: '装甲', match: ['元首卫队旅'],
-      name: '元首卫队旅（Führer-Begleit）',
-      strength: '元首卫队装甲营、装甲掷弹兵 等',
+      key: 'de_fbb', side: 'DE', type: '装甲', match: ['最高统帅部护卫旅'],
+      name: '最高统帅部护卫旅（Führer-Begleit）',
+      strength: '最高统帅部警卫装甲营、装甲掷弹兵 等',
       histDate: '1944-12-18',
-      photo: CDN_WM + 'a/ad/German_Tiger_II_tank_passes_American_prisoners%2C_16_December_1944_%28111-SC-198241%29.jpg',
-      photoCaption: '1944年12月16日，德军虎王坦克经过被俘美军（资料照片）',
-      intro: '元首卫队旅（Führer-Begleit-Brigade）最初是希特勒大本营的护卫部队，1944年12月扩编为旅级装甲战斗群投入阿登攻势，配属第5装甲集团军，参与中路向马斯河方向的突击。',
+      photo: PH26U,
+      photoCaption: '',
+      intro: '最高统帅部护卫旅（Führer-Begleit-Brigade）最初是德军最高统帅部大本营的护卫部队，1944年12月扩编为旅级装甲战斗群投入阿登攻势，配属第5装甲集团军，参与中路向马斯河方向的突击。',
     },
     {
       key: 'de_3pg', side: 'DE', type: '装甲掷弹兵', match: ['第3装掷师'],
       name: '第3装甲掷弹兵师',
       strength: '第8/29装甲掷弹兵团、第103装甲营 等',
       histDate: '1944-12-19',
-      photo: CDN_WM + '6/61/GERMAN_TROOPS_ADVANCING_PAST_ABANDONED_AMERICAN_EQUIPMENT.jpg',
-      photoCaption: '阿登战役中德军部队越过被弃置的美军装备（资料照片）',
+      photo: PH26U,
+      photoCaption: '',
       intro: '第3装甲掷弹兵师在阿登攻势中配属德军第7集团军，负责南翼的掩护与推进，在巴斯托涅以东方向作战，参与切断并威胁该城与南方的联系。',
     },
     {
-      key: 'de_fgb', side: 'DE', type: '装甲', match: ['元首掷弹旅'],
-      name: '元首掷弹旅（Führer-Grenadier）',
-      strength: '元首掷弹旅装甲营、装甲掷弹兵 等',
+      key: 'de_fgb', side: 'DE', type: '装甲', match: ['最高统帅部掷弹兵旅'],
+      name: '最高统帅部掷弹兵旅（Führer-Grenadier）',
+      strength: '最高统帅部掷弹兵旅装甲营、装甲掷弹兵 等',
       histDate: '1945-01-01',
-      photo: CDN_WM + 'e/e2/Captured_German_Panther_tank_crewman_1944.jpg',
-      photoCaption: '一名被俘的德军"黑豹"坦克乘员（1944年）',
-      intro: '元首掷弹旅（Führer-Grenadier-Brigade）与元首卫队旅同源，1944年底扩编，1945年1月初投入阿登战场，参与德军在突出部南翼的最后攻势，此后随战局转为防御。',
+      photo: PH26U,
+      photoCaption: '',
+      intro: '最高统帅部掷弹兵旅（Führer-Grenadier-Brigade）与最高统帅部护卫旅同源，1944年底扩编，1945年1月初投入阿登战场，参与德军在突出部南翼的最后攻势，此后随战局转为防御。',
     },
   ];
 
@@ -1593,43 +1653,43 @@ globalThis.DATA = (function () {
       side: 'DE', degree: '决定性胜利',
       title: '装甲洪流 · 直抵马斯河',
       cheer: '「我们已抵达马斯河。」雪原之上，德军的钢铁洪流碾碎了盟军引以为傲的防线。这是 1940 年以来西线最大胆的一次突破——通往安特卫普的大门，轰然洞开。',
-      photo: CDN_WM + 'a/ad/German_Tiger_II_tank_passes_American_prisoners%2C_16_December_1944_%28111-SC-198241%29.jpg',
-      photoCaption: '1944年12月16日，德军虎王坦克经过被俘美军（资料照片）',
+      photo: PH26U,
+      photoCaption: '',
     },
     DE_tactical: {
       side: 'DE', degree: '战术胜利',
       title: '铁拳砸穿阿登',
       cheer: '圣维特、巴斯托涅——两个名字被写进了战史。德军的铁拳在阿登的雪原上砸穿了盟军防线，虽未能发展成合围，却足以让整个西线为之震颤。',
-      photo: CDN_WM + '6/61/GERMAN_TROOPS_ADVANCING_PAST_ABANDONED_AMERICAN_EQUIPMENT.jpg',
-      photoCaption: '阿登战役中德军部队越过被弃置的美军装备（资料照片）',
+      photo: PH26U,
+      photoCaption: '',
     },
     DE_hold: {
       side: 'DE', degree: '胜利',
       title: '寸土不让 · 突出部犹在',
       cheer: '盟军的反攻撞上钢铁壁垒，一寸未得。在最寒冷的冬天里，德军守住了用鲜血换来的突出部——战果依然在握。',
-      photo: CDN_WM + '1/11/German_Tiger_II_tank_in_Stavelot%2C_Belgium%2C_21_December_1944_%28111-SC-198115%29.jpg',
-      photoCaption: '德军虎王坦克，比利时斯塔沃洛（1944年12月21日）',
+      photo: PH26U,
+      photoCaption: '',
     },
     US_decisive: {
       side: 'US', degree: '决定性胜利',
       title: '「Nuts!」',
       cheer: '「Nuts!」——从巴斯托涅到圣维特，德军的每一次突击都撞在钢铁防线上。目标尽失、损失惨重的敌军狼狈退回出发地。阿登的雪原，因你们而自由。',
-      photo: CDN_WM + 'd/d3/101st_Airborne_troops_move_out_of_Bastogne.jpg',
-      photoCaption: '第101空降师的士兵走出巴斯托涅（1945年1月）',
+      photo: PH26U,
+      photoCaption: '',
     },
     US_win: {
       side: 'US', degree: '胜利',
       title: '最后的赌注 · 输光了',
       cheer: '德军最后的赌注输光了。突出部被挡住、被削平——阿登的雪原上，盟军的旗帜依然高高飘扬。你们守住的不只是一条防线，而是欧洲的黎明。',
-      photo: CDN_WM + '8/8b/Photograph_of_Tanks_of_the_4th_Armored_Division_-_NARA_-_12010181.jpg',
-      photoCaption: '第4装甲师的坦克（美国国家档案馆 NARA 藏品）',
+      photo: PH26U,
+      photoCaption: '',
     },
     US_pyrrhic: {
       side: 'US', degree: '惨胜',
       title: '惨胜 · 亦是胜',
       cheer: '突出部最终被削平，代价却异常沉重——德军主力得以脱身。这是一场胜利，更是一记警钟：自由从来不是廉价的。擦干血与雪，前路仍有硬仗。',
-      photo: CDN_WM + '6/63/M7_105-MM._SP_HOWITZER_OF_THE_30TH_DIVISION_IN_ACTION_near_la_Gleize.jpg',
-      photoCaption: '第30步兵师的 M7 105 毫米自行榴弹炮在拉格莱兹附近射击',
+      photo: PH26U,
+      photoCaption: '',
     },
     /* 取消回合限制 / 歼灭模式（第二十三轮）：一方全部建制（含援军）被消灭时的专属终局画面。
      * degree 用"歼灭胜利"与上面六组的"决定性/战术/惨胜"区分开，一眼能看出这是歼灭战的结果。 */
@@ -1637,15 +1697,15 @@ globalThis.DATA = (function () {
       side: 'DE', degree: '歼灭胜利',
       title: '清扫战场 · 再无盟军一兵一卒',
       cheer: '雪原上的枪声稀疏下去。从艾费尔到马斯河，美军的每一个番号都被从态势图上抹去——包括那些日夜兼程赶来的增援。这场豪赌押上了最后一块筹码，也赢下了最后的胜利。',
-      photo: CDN_WM + 'e/e2/MortainDasReich.jpg',
-      photoCaption: '德军装甲部队在反攻中推进（1944年，资料照片）',
+      photo: PH26U,
+      photoCaption: '',
     },
     US_annihilation: {
       side: 'US', degree: '歼灭胜利',
       title: '钢铁洪流 · 尽数折戟阿登',
       cheer: '德军最后的家底——从党卫装甲师到国民掷弹兵，连同它们苦苦等来的每一支援军——都在阿登的雪原上化为废铁。没有突围，没有撤退：突出部成了一口吞下整支德军的口袋。',
-      photo: CDN_WM + '6/69/M4_Sherman_tanks_of_the_U.S._7th_Armored_Division_near_St._Vith%2C_Belgium%2C_24_January_1945_%28148727210%29.jpg',
-      photoCaption: '美军第7装甲师的 M4 谢尔曼坦克，比利时圣维特附近（1945年1月）',
+      photo: PH26U,
+      photoCaption: '',
     },
   };
 
@@ -1660,13 +1720,13 @@ globalThis.DATA = (function () {
       side: 'DE',
       name: '瓦尔特·莫德尔 陆军元帅',
       post: 'B集团军群司令 · "守望莱茵"行动总指挥',
-      photo: CDN_WM + '8/84/Bundesarchiv_Bild_183-J27784%2C_Arnheim%2C_Walter_Model%2C_Heinz_Harmel.jpg',
-      photoCaption: 'B集团军群司令莫德尔在阿纳姆前线（1944年9月）',
-      credit: '照片：维基共享资源 · 德国联邦档案 Bundesarchiv Bild 183-J27784（CC BY-SA 3.0 DE）｜ 加载失败时显示档案插图',
+      photo: PH26U,
+      photoCaption: '',
+      credit: '',
       intro: [
         '我是瓦尔特·莫德尔，B集团军群司令。12月16日凌晨5点30分，上千门火炮在阿登同时开火——「守望莱茵」行动，开始了。',
         '奇袭已经得手。大雾把盟军的空中优势锁死在地面上；美军第8军正面（第106、第99师这些新部队）被我们的三路突击凿开——第6装甲集团军走北路，第5装甲集团军走中路，第7集团军掩护南翼。',
-        '这个计划连一公里都推进不了——这话是我亲口对元首说的，当时我还多要了三十个师。命令没有改，那就把它打成事实：这一仗只许成功。',
+        '这个计划连一公里都推进不了——这话是我亲口向最高统帅部说的，当时我还多要了三十个师。命令没有改，那就把它打成事实：这一仗只许成功。',
         '出发时我们只带了够走一半的油。斯塔沃洛、斯帕的美军油库是装甲矛头的命脉；而阿登一放晴，盟军的飞机就会回来——留给我们的窗口只有一个星期。',
       ],
       // 取消回合限制 / 歼灭模式（第二十三轮）：追加的局势段与目标段
@@ -1686,9 +1746,9 @@ globalThis.DATA = (function () {
       side: 'US',
       name: '奥马尔·布莱德雷 中将',
       post: '第12集团军群司令',
-      photo: CDN_WM + '1/1a/General_of_the_Army_Omar_Bradley_%28crop%29.jpg',
-      photoCaption: '奥马尔·布莱德雷（美国陆军官方肖像）',
-      credit: '照片：维基共享资源 · 美国陆军官方肖像（公有领域 PD）｜ 加载失败时显示档案插图',
+      photo: PH26U,
+      photoCaption: '',
+      credit: '',
       intro: [
         '我是奥马尔·布莱德雷，第12集团军群司令。12月16日拂晓，德军在你最没想到的方向——阿登——发起了总攻。这道口子，是德国人用最后的家底赌出来的。',
         '阿登一直被当成"安静防区"，第106、第99师这些新部队正在那里休整。现在德军3个集团军压了过来，第8军的正面被凿穿。能挡住他们的，暂时只有你手头这点兵力。',
@@ -3530,6 +3590,14 @@ globalThis.Game = (function () {
         })),
       };
     }
+    /* 25b 撤子: 快照/恢复（自大阿登移植；restore 先清容器防算子叠加） */
+    snapshotJson() { return JSON.stringify(this.serialize()); }
+    restoreJson(json) {
+      this.units = [];
+      this.grid.clear();
+      this._zocDirty();
+      this._load(JSON.parse(json));
+    }
     _load(s) {
       // 恢复状态
       this.state = Object.assign({}, s.state);
@@ -4842,7 +4910,26 @@ globalThis.Renderer3D = (function () {
       this._anims = [];
       this.animScale = 1;             // AI 阶段由 UI 调低（0.6）加速动画；人类操作保持 1
       this._effects = [];
-      this._unitMeshes = new Map();   // uid -> group
+      this._unitMeshes = new Map();
+      this._hlMat = new THREE.LineBasicMaterial({ color: 0xd8c48a, transparent: true, opacity: 0.3, depthWrite: false });
+      /* 26c: 指挥部金框（常亮, 提示该单位重要） */
+      this._hqMat = new THREE.LineBasicMaterial({ color: 0xffe680, transparent: true, opacity: 1.0, depthWrite: false, blending: THREE.AdditiveBlending });   // 26c2: 加色混合=发光感
+      /* 26c3: 光晕/粗边带共享材质（呼吸由主循环统一驱动） */
+      this._hqGlowMat = new THREE.MeshBasicMaterial({ map: this._hqGlowTex, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false });
+      this._hqBandMat = new THREE.MeshBasicMaterial({ color: 0xffe680, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+      this.highlightSide = null;   // 25c: 人类操作阶段阵营(DE/US), 由 ui 维护; null=不高亮   // uid -> group
+
+      /* 26c3: 指挥部光晕纹理（径向渐变, 懒生成一次） */
+      this._hqGlowTex = (() => {
+        const c = document.createElement('canvas'); c.width = 128; c.height = 128;
+        const g = c.getContext('2d');
+        const grad = g.createRadialGradient(64, 64, 8, 64, 64, 64);
+        grad.addColorStop(0, 'rgba(255, 226, 140, 0.85)');
+        grad.addColorStop(0.55, 'rgba(255, 210, 100, 0.38)');
+        grad.addColorStop(1, 'rgba(255, 200, 80, 0)');
+        g.fillStyle = grad; g.fillRect(0, 0, 128, 128);
+        const t = new THREE.CanvasTexture(c); return t;
+      })();
       this._overlay = [];             // 覆盖层网格池
       this._pathDots = [];
       this._snow = null;
@@ -5328,6 +5415,18 @@ globalThis.Renderer3D = (function () {
       // 注: 早期版本在算子上方挂过一个"组织度徽章 Sprite"(y=1.65)。相机是近乎垂直俯视,
       // 那个 sprite 投影下来正好压在算子面的 NATO 符号上, 且与算子底部的"组织 X"重复显示,
       // 故按用户要求移除(2026-10); 组织度只保留算子面底部与左侧单位面板两处。
+      // 25c: 未移动算子金框呼吸高亮（方框贴算子外沿, 与算子同高）
+      const hlGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(2.3, 0.58, 2.3));
+      const hl = new THREE.LineSegments(hlGeo, this._hlMat);
+      g.add(hl);
+      g.userData.hl = hl;
+      /* 26c: 指挥部额外一圈常亮金框（比呼吸框外 0.06, 更亮） */
+      if (u.isHQ) {
+        const hqFrame = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(2.42, 0.62, 2.42)), this._hqMat);
+        hqFrame.userData.isHqFrame = true;
+        g.add(hqFrame);
+      }
+      g.userData.unit = u;
       g.userData.uid = u.uid;
       g.userData.lastOrg = u.org;
       this._unitMeshes.set(u.uid, g);
@@ -5367,6 +5466,8 @@ globalThis.Renderer3D = (function () {
       }
     }
 
+    setHighlightSide(side) { this.highlightSide = side || null; }
+
     syncUnits(game) {
       const seen = new Set();
       for (const u of game.units) {
@@ -5404,6 +5505,61 @@ globalThis.Renderer3D = (function () {
       this.scene.add(mesh);
       this._overlay.push(mesh);
       return mesh;
+    }
+
+    /* —— 25g 行军箭头预览 —— */
+    _marchArrow = [];
+
+    clearMarchArrow() {
+      for (const m of this._marchArrow) { this.scene.remove(m); if (m.geometry) m.geometry.dispose(); }
+      this._marchArrow = [];
+    }
+
+    showMarchArrow(u, path, dist) {
+      this.clearMarchArrow();
+      if (!path || path.length < 2) return;
+      const mpMax = u.mov || 6;
+      const colOf = acc => (acc <= mpMax * 0.4 ? 0x7dc87a : acc <= mpMax * 0.75 ? 0xe6c85c : acc <= mpMax ? 0xe08a3c : 0xe05a4a);
+      const W = 0.42;
+      const addBand = (from, to, color, op) => {
+        const a = this.hexWorld(from.c, from.r), b = this.hexWorld(to.c, to.r);
+        const dx = b.x - a.x, dz = b.z - a.z, len = Math.hypot(dx, dz);
+        if (len < 0.01) return;
+        const ang = Math.atan2(dx, dz);
+        const seg = new THREE.Mesh(new THREE.PlaneGeometry(W, len),
+          new THREE.MeshBasicMaterial({ color, transparent: true, opacity: op, depthWrite: false, side: THREE.DoubleSide }));
+        seg.rotation.x = -Math.PI / 2; seg.rotation.z = ang;
+        seg.position.set((a.x + b.x) / 2, this.hexTopY(this.hexAt(from.c, from.r)) + 0.26, (a.z + b.z) / 2);
+        seg.renderOrder = 5;
+        this.scene.add(seg); this._marchArrow.push(seg);
+      };
+      // 分段: 相邻累计档位同色合并为一段带(减少 mesh), 溢出段半透明
+      let runFrom = path[0], runAcc = 0, runCol = null;
+      for (let i = 1; i < path.length; i++) {
+        const acc = dist.get(Hex.key(path[i].c, path[i].r)) || 0;
+        const col = colOf(acc), op = acc > mpMax ? 0.45 : 0.85;
+        if (runCol === null) runCol = { c: col, op };
+        if (col !== runCol.c || op !== runCol.op) {
+          addBand(runFrom, path[i], runCol.c, runCol.op);
+          runFrom = path[i - 1]; runCol = { c: col, op };
+        }
+        runAcc = acc;
+        if (i === path.length - 1) addBand(runFrom, path[i], runCol.c, runCol.op);
+      }
+      // 末端箭头(三角平面, 指向末段方向)
+      const tail = path[path.length - 1], prev = path[path.length - 2];
+      const a = this.hexWorld(prev.c, prev.r), b = this.hexWorld(tail.c, tail.r);
+      const dx = b.x - a.x, dz = b.z - a.z, len = Math.hypot(dx, dz);
+      if (len > 0.01) {
+        const ang = Math.atan2(dx, dz);
+        const head = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.95, 3),
+          new THREE.MeshBasicMaterial({ color: 0xffe680, transparent: true, opacity: 0.95, depthWrite: false }));
+        head.rotation.z = -ang + Math.PI;   // ConeGeometry 轴向 +Y, 俯视指向行进方向
+        head.rotation.x = Math.PI / 2;
+        head.position.set(b.x, this.hexTopY(this.hexAt(tail.c, tail.r)) + 0.34, b.z);
+        head.renderOrder = 6;
+        this.scene.add(head); this._marchArrow.push(head);
+      }
     }
 
     showMoveRange(reach) {
@@ -5753,12 +5909,30 @@ globalThis.Renderer3D = (function () {
       const h = this._pickHex(e);
       if (h && this.onHexClick) this.onHexClick(h.c, h.r);
     }
+    /* 25i: 纯地形拾取——鼠标射线与六角地面求交, 不受算子碰撞盒影响。
+       用于悬停箭头/移动预览：拥挤区算子盒覆盖邻格时, 预览仍跟地面格走。 */
+    _pickTerrainHex(e) {
+      const rect = this.renderer.domElement.getBoundingClientRect();
+      this._pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      this._pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      this._raycaster.setFromCamera(this._pointer, this.camera);
+      const hits = this._raycaster.intersectObject(this._hexMesh);
+      if (!hits.length) return null;
+      let i = 0;
+      for (const [k, h] of this.map.hexes) {
+        if (i === hits[0].instanceId) return h;
+        i++;
+      }
+      return null;
+    }
+
     _doHover(e) {
       const h = this._pickHex(e);
+      const th = this._pickTerrainHex(e);   // 25i: 地面格（箭头预览用, 不受算子盒影响）
       const k = h ? Hex.key(h.c, h.r) : null;
       if (k !== this._hoverKey) {
         this._hoverKey = k;
-        if (this.onHexHover) this.onHexHover(h ? h.c : null, h ? h.r : null);
+        if (this.onHexHover) this.onHexHover(h ? h.c : null, h ? h.r : null, th ? th.c : null, th ? th.r : null);
       }
     }
 
@@ -5772,7 +5946,12 @@ globalThis.Renderer3D = (function () {
 
     /* ---------------- 主循环 ---------------- */
     _loop() {
+      /* 25j 渲染循环自愈: 单帧异常只跳过该帧, RAF 链不中断; 首次 console.error */
       requestAnimationFrame(() => this._loop());
+      try {
+
+      requestAnimationFrame(() => this._loop());
+
       const dt = Math.min(0.2, this._clock.getDelta());
       // 移动动画
       for (let i = this._anims.length - 1; i >= 0; i--) {
@@ -5807,6 +5986,17 @@ globalThis.Renderer3D = (function () {
         }
         if (k >= 1) { this.scene.remove(e); this._effects.splice(i, 1); }
       }
+      // 25c: 未移动算子金框呼吸（微亮, 不抢氛围）
+      if (this._hlMat) this._hlMat.opacity = 0.26 + Math.sin(performance.now() * 0.0035) * 0.12;
+      if (this._hqGlowPulse === undefined) this._hqGlowPulse = 0.9;
+      this._hqGlowPulse = 0.88 + Math.sin(performance.now() * 0.0028) * 0.1;   // 26c3: 光晕高亮度微呼吸
+      if (this._hqGlowMat) this._hqGlowMat.opacity = this._hqGlowPulse;
+      if (this.highlightSide) {
+        for (const [, g] of this._unitMeshes) {
+          const u = g.userData.unit;
+          g.userData.hl.visible = !!u && u.alive && !u.exited && u.side === this.highlightSide && !u.moved;
+        }
+      }
       // 脉冲目标格
       if (this._pulse) {
         const s = 1 + Math.sin(performance.now() * 0.006) * 0.25;
@@ -5832,6 +6022,10 @@ globalThis.Renderer3D = (function () {
         this._snow.geometry.attributes.position.needsUpdate = true;
       }
       this.renderer.render(this.scene, this.camera);
+    
+      } catch (e) {
+        if (!this._loopErr) { this._loopErr = true; console.error('[渲染循环异常已自愈]', e.message, e.stack && e.stack.split('\n')[1]); }
+      }
     }
   }
 
@@ -6388,7 +6582,7 @@ globalThis.UI = (function () {
         b.disabled = !chk.ok;
         b.title = (engr ? '工兵自带筑垒能力：不消耗本方野战工事令牌，每单位限一次\n' : '') +
           (chk.ok ? DATA.BUFFS[id].desc : chk.why);
-        b.onclick = () => { SFX.play('click'); game.grantBuff(id, u); refreshUnitPanel(); };
+        b.onclick = () => { SFX.play('click'); markUndo(); game.grantBuff(id, u); refreshUnitPanel(); };
         btns.appendChild(b);
       }
     }
@@ -6453,6 +6647,7 @@ globalThis.UI = (function () {
 
   /* ---------------- 点击处理 ---------------- */
   function onHexClick(c, r) {
+    if (paused) { showBanner('推演暂停中', '点顶栏「继续」恢复', 1500); return; }
     if (aiBusy || !game || game.state.over) return;
     const u = game.unitAt(c, r);
     if (mode === 'advance') { handleAdvanceClick(c, r); return; }
@@ -6469,6 +6664,7 @@ globalThis.UI = (function () {
         const path = game.pathFromReach(reach, Hex.key(c, r));
         if (path && path.length) {
           const unit = selected;
+          markUndo();
           game.doMove(unit, path);
           // 选中状态保留(可继续攻击), 刷新可达域
           reach = unit.moved ? null : game.getReach(unit);
@@ -6496,6 +6692,7 @@ globalThis.UI = (function () {
     const arty = game.artyInRange(defUnit);
     renderOddsPopup(defUnit, attUnits, arty, (ok, chosenArty) => {
       if (!ok) { renderer._clearOverlay(); highlightAttackTargets(); return; }
+      markUndo();
       const res = game.doAttack(attUnits, defUnit, chosenArty);
       if (res && res.advanceOffer) enterAdvanceMode();
       if (selected && (!selected.alive || selected.moved)) {
@@ -6566,6 +6763,7 @@ globalThis.UI = (function () {
     if (!t || t.side === selected.side) return;
     let rng = selected.range - (game.state.weather === 'fog' ? 1 : 0);
     if (Hex.distance(selected.c, selected.r, c, r) > rng) { SFX.play('warning'); showBanner('超出射程', '', 900); return; }
+    markUndo();
     game.artyFire(selected, t);
     setMode('selected');
   }
@@ -6574,6 +6772,7 @@ globalThis.UI = (function () {
     const t = game.unitAt(c, r);
     const side = game.state.phase;
     if (!t || t.side === side) return;
+    markUndo();
     game.airStrike(t, side);
     setMode('idle');
     refreshTop();
@@ -6607,26 +6806,65 @@ globalThis.UI = (function () {
   }
 
   /* ---------------- 悬浮提示 ---------------- */
-  function onHexHover(c, r) {
+  function onHexHover(c, r, tC, tR) {
     const tip = $('tooltip');
-    if (c === null || aiBusy) { tip.style.display = 'none'; return; }
+    if (c === null || aiBusy) { tip.style.display = 'none'; renderer.clearMarchArrow(); return; }
     const h = game.hexAt(c, r);
-    if (!h) { tip.style.display = 'none'; return; }
+    if (!h) { tip.style.display = 'none'; renderer.clearMarchArrow(); return; }
     const t = DATA.TERRAIN[h.terrain];
     let html = `<b>${t.name}</b> · 移动${t.mv} · 防御×${t.dm}`;
     if (h.road) html += ' · 公路';
     if (h.river) html += h.bridge ? ' · <span style="color:#d8b74a">桥梁</span>' : ' · 河流';
-    if (h.town) html += `<br><b style="color:${h.town.ctrl === 'DE' ? '#b8c4b0' : '#a8c8e8'}">${h.town.ctrl === 'DE' ? '德占' : '美占'} · ${h.town.name}</b>${h.town.supply ? ' · 补给点' : ''}`;
+    if (h.town) {
+      const tt = { 1: '师级', 2: '军级', 3: '集团军级' }[h.town.tier] || '师级';
+      const tw = game.map.towns.find(x => x.c === h.c && x.r === h.r);
+      html += `<br><b style="color:${h.town.ctrl === 'DE' ? '#b8c4b0' : '#a8c8e8'}">${h.town.ctrl === 'DE' ? '德占' : '美占'} · ${h.town.name}</b>`;
+      if (h.town.supply) html += ` · ${tt}补给点（预算 ${tw ? tw.range : DATA.SUPPLY_R_TOWN}）<br><span style="opacity:.7">点击查看补给覆盖范围</span>`;
+    }
     if (h.exit) html += '<br><span style="color:#d8b74a">马斯河突破线</span>';
-    const u = game.unitAt(c, r);
-    if (u) {
-      html += `<br>─────<br>${u.side === 'DE' ? '德军' : '美军'} ${u.name}<br>攻${u.type === 'ART' ? u.sup + '(支援)' : u.atk} 防${u.def} 移${u.mov} · 组织度${u.org}/${u.maxOrg}${u.supplied ? '' : ' · <span style="color:#e8907a">断补</span>'}`;
+    const un = game.unitAt(c, r);
+    if (un) {
+      html += `<br>─────<br>${un.side === 'DE' ? '德军' : '美军'} ${un.name}<br>攻${un.type === 'ART' || un.type === 'RKT' ? un.sup + '(支援)' : un.atk} 防${un.def} 移${un.mov} · 组织度${un.org}/${un.maxOrg}${un.supplied ? '' : ' · <span style="color:#e8907a">断补</span>'}`;
     }
     tip.innerHTML = html;
     tip.style.display = 'block';
     tip.style.left = Math.min(window.innerWidth - 280, lastMouse.x + 16) + 'px';
     tip.style.top = (lastMouse.y + 16) + 'px';
+    // —— 25g 行军箭头预览 + 25h MP/攻击预览（地面格 gC/gR 优先, 解决算子盒遮挡导致的解析偏移）——
+    const gC = (tC !== undefined && tC !== null) ? tC : c;
+    const gR = (tC !== undefined && tC !== null) ? tR : r;
+    if (selected && reach && mode === 'selected' && gC !== null && gC !== undefined && !aiBusy) {
+      const k = Hex.key(gC, gR);
+      if (reach.dist.has(k) && !game.unitAt(gC, gR)) {
+        // 25g 修: pathFromReach 不含起点格——补起点, 否则相邻格(最常见的单步移动)箭头永不显示
+        const p = game.pathFromReach(reach, k);
+        if (p && p.length) {
+          const full = [{ c: selected.c, r: selected.r }, ...p];
+          renderer.showMarchArrow(selected, full, reach.dist);
+        } else renderer.clearMarchArrow();
+        // —— 25h MP/攻击预览（tooltip 增强行）——
+        const acc = reach.dist.get(k);
+        let mpLine = `<br><span style="color:#e6c85c">⇢ 行军 ${acc} MP`;
+        if (acc > selected.mov) mpLine += `（超支 ${acc - selected.mov}，约 ${Math.ceil(acc / Math.max(1, selected.mov))} 回合抵达）`;
+        else mpLine += ` · 剩余 ${Math.max(0, selected.mov - acc)} MP`;
+        mpLine += '</span>';
+        const tf = game.unitAt(gC, gR);
+        const foe = Hex.neighbors(gC, gR).map(n => game.unitAt(n.c, n.r)).find(f => f && f.alive && f.side !== selected.side);
+        if (foe) {
+          const atts = game.attackersFor(foe);
+          if (atts.length) {
+            const pv = game.previewAttack(atts, foe, []);
+            if (pv.atk > 0) {
+              mpLine += `<br><b style="color:#f0a090">⚔ 攻击预览 ${pv.key}</b>　攻 ${Math.round(pv.atk * 10) / 10} / 防 ${Math.round(pv.def * 10) / 10}`;
+              if (pv.shifts && pv.shifts.length) mpLine += `（${pv.shifts.map(x => x.name).join('、')}）`;
+            }
+          }
+        }
+        tip.innerHTML += mpLine;
+      } else renderer.clearMarchArrow();
+    } else renderer.clearMarchArrow();
   }
+
   let lastMouse = { x: 0, y: 0 };
   window.addEventListener('mousemove', e => { lastMouse = { x: e.clientX, y: e.clientY }; });
 
@@ -6691,6 +6929,9 @@ globalThis.UI = (function () {
     g.on('buff', () => SFX.play('buff'));
     g.on('weather', () => { renderer.setWeather(game.state.weather); SFX.play('weather'); });
     g.on('phase', () => {
+      renderer.setHighlightSide(
+        (game.state.phase === 'DE' ? aiDE : aiUS) ? null : game.state.phase);   // 25c: 人类阶段高亮未移动算子
+      undoSnap = null;   // 25b: 阶段切换作废撤子
       renderer.syncUnits(game);
       refreshTop();
       SFX.play('phase', { side: game.state.phase });
@@ -6703,6 +6944,7 @@ globalThis.UI = (function () {
     g.on('move', () => achvTick());
     g.on('combat', () => achvTick());
     g.on('over', () => { renderer.syncUnits(game); SFX.play('over', { winner: game.state.winner }); achvFinish(); showOverModal(); });
+      renderer.setHighlightSide(null);   // 25c
     g.on('state', () => refreshTop());
   }
 
@@ -6767,12 +7009,48 @@ globalThis.UI = (function () {
   }
 
   /* ---------------- AI 调度 ---------------- */
+  /* —— 25b 撤子/暂停（自大阿登移植）—— */
+  let undoSnap = null;
+  let paused = false;
+  function markUndo() {
+    if (paused || aiBusy || !game || game.state.over) return;
+    try { undoSnap = game.snapshotJson(); } catch (e) { undoSnap = null; }
+  }
+  function doUndo() {
+    if (!undoSnap) { showBanner('没有可撤的操作', '撤子仅在你最近一次行动前留一个档', 1800); return; }
+    if (aiBusy) { showBanner('AI 行动中', 'AI 阶段结束后才能撤子', 1600); return; }
+    if (game.state.over) { showBanner('战役已结束', '终局后不能撤子', 1600); return; }
+    try {
+      game.restoreJson(undoSnap);
+      undoSnap = null;
+      selected = null; reach = null; mode = 'idle';
+      renderer.clearSelection();
+      renderer.buildWorld(game.map, game);
+      renderer.syncUnits(game);
+      renderer.setWeather(game.state.weather);
+      refreshTop(); refreshUnitPanel();
+      game.log('已撤回上一手（战损、令牌、城镇归属一并回滚；骰运将重新掷取）', 'sys');
+      SFX.play('page');
+    } catch (e) {
+      showBanner('撤子失败', String(e.message).slice(0, 60), 2400);
+    }
+  }
+  function togglePause() {
+    paused = !paused;
+    const b = document.getElementById('btnPause');
+    if (b) b.textContent = paused ? '\u25B6 继续' : '\u23F8 暂停';
+    SFX.play('click');
+    showBanner(paused ? '推演暂停' : '继续推演', paused ? 'AI 与操作已冻结' : '恢复指挥', 1600);
+    if (!paused) maybeAI();
+  }
   function maybeAI() {
+    if (paused) return;
     if (!game || game.state.over || aiBusy || briefingOpen) return;
     const side = game.state.phase;
     const isAI = side === 'DE' ? aiDE : aiUS;
+    if (isAI) { /* 看门狗时间戳在 aiBusy=true 后打 */ }
     if (!isAI) { if (renderer) { renderer.animScale = 1; renderer.skipMoveAnim = false; } refreshTop(); return; }
-    aiBusy = true;
+    aiBusy = true; window.__aiBusySince = Date.now();
     const Sp = aiSpeedCfg();
     if (renderer) { renderer.animScale = Sp.anim; renderer.skipMoveAnim = Sp.skipMove; }   // AI 阶段加速（人类操作仍 1×）
     refreshTop(); refreshHint();
@@ -6808,6 +7086,23 @@ globalThis.UI = (function () {
   /* ---------------- 援军"部队档案"卡（2026-10 第十一轮） ---------------- */
   let reinBuf = [];              // 本阶段缓冲的入场单位
   let reinTimer = 0;
+  window.__errs = window.__errs || [];
+  window.addEventListener('error', e => {
+    const msg = '[运行错误] ' + (e.message || '') + ' @ ' + String(e.filename || '').split('/').pop() + ':' + (e.lineno || '?');
+    window.__errs.push(msg);
+    try { if (game && game.log) game.log(msg, 'warn'); } catch (e2) {}
+  });
+  window.__aiBusySince = 0;
+  setInterval(() => {
+    if (!game || game.state.over || !aiBusy) return;
+    if (Date.now() - window.__aiBusySince > 45000) {
+      aiBusy = false;
+      const msg = '[AI 看门狗] 阶段超过 45s 未推进，强制交还并推进';
+      window.__errs.push(msg);
+      try { game.log(msg, 'warn'); if (!game.state.over) game.endPhase(); } catch (e2) {}
+      maybeAI();
+    }
+  }, 5000);
   let dossierQueue = [];         // 待展示的档案(每场每建制只弹一次)
   let dossierShown = new Set();  // 已展示过的档案 key
   let dossierOpen = false;
@@ -6833,6 +7128,7 @@ globalThis.UI = (function () {
       if (d && !dossierShown.has(d.key)) { dossierShown.add(d.key); ds.push({ d, u }); }
     }
     if (!ds.length) { showBanner('增援抵达', units[units.length - 1].name, 1400); return; }
+    if (!dosPop) return;   // 25b: 弹卡关闭时横幅即达（本批仍标记已读）
     // 有档案：横幅提示整批入场，随后依次弹档案卡
     const names = ds.map(x => x.d.name).join('、');
     showBanner('援军抵达', names, 1800);
@@ -7155,8 +7451,6 @@ globalThis.UI = (function () {
       SFX.init();            // 用户手势：此刻解锁 AudioContext（浏览器自动播放策略）
       aiDE = side === 'us' || side === 'watch';
       aiUS = side === 'de' || side === 'watch';
-      $('btnAIde').classList.toggle('active', aiDE);
-      $('btnAIus').classList.toggle('active', aiUS);
       $('modal').style.display = 'none';
       achvRole = side; achvNoLimit = noLimit;      // 供 achvMeta 读取（模块级副本）
       startGame(selScen, null, { noTurnLimit: noLimit });
@@ -7167,12 +7461,91 @@ globalThis.UI = (function () {
         SFX.init();          // 同样是用户手势
         const s = JSON.parse(localStorage.getItem('ardennes44_save'));
         aiDE = false; aiUS = false;
-        $('btnAIde').classList.remove('active'); $('btnAIus').classList.remove('active');
         $('modal').style.display = 'none';
         achvRole = null;                            // 读档：沿用存档里 achvTrack.meta（不覆盖身份）
         startGame(s.scenarioId, s);
       } catch (e) { alert('存档读取失败'); }
     };
+  }
+
+  /* —— 25b AI 指挥面板（自大阿登移植）—— */
+  function showAIModal() {
+    const box = $('modalBox');
+    box.className = 'box ach-box';
+    const paint = () => {
+      const row = (label, desc, on, fn) =>
+        '<div class="aim-row"><div><div class="aim-t">' + label + '</div><div class="aim-d">' + desc + '</div></div>' +
+        '<button class="aim-sw ' + (on ? 'on' : '') + '" data-fn="' + fn + '">' + (on ? '开启' : '关闭') + '</button></div>';
+      const spd = (k, label, desc) => {
+        const cur = aiSpeedCfg().key;
+        return '<button class="aim-pc' + (cur === k ? ' on' : '') + '" data-k="' + k + '"><b>' + label + '</b><span>' + desc + '</span></button>';
+      };
+      box.innerHTML =
+        '<div class="ach-head"><h1>AI 指挥</h1>' +
+        '<div class="ach-prog">接管任一阵营的阶段推演<br>开关即时生效</div></div>' +
+        '<div class="aim-sec">' +
+        row('德军 AI', '德军阶段由 AI 自动推演（装甲突击 · 夺要点渡河）', aiDE, 'de') +
+        row('美军 AI', '美军阶段由 AI 自动推演（防守反击 · 迟滞待晴）', aiUS, 'us') +
+        '</div>' +
+        '<div class="aim-sec"><div class="aim-t">行动速度</div><div class="aim-speeds">' +
+        spd('standard', '标准', '完整动画 · 观战体验最佳') +
+        spd('fast', '快速', '动画压缩 · 兼顾观感与节奏') +
+        spd('turbo', '极速', '跳过移动动画 · 直出结果') +
+        '</div></div>' +
+        '<div class="foot"><button class="primary" id="aimClose">关 闭</button></div>';
+      $('modal').style.display = 'flex';
+      box.querySelectorAll('.aim-sw').forEach(b => b.onclick = () => {
+        SFX.play('click');
+        if (b.dataset.fn === 'de') aiDE = !aiDE;
+        else aiUS = !aiUS;
+        paint(); maybeAI();
+      });
+      box.querySelectorAll('.aim-pc').forEach(b => b.onclick = () => {
+        SFX.play('click');
+        const i = AI_SPEEDS.findIndex(s2 => s2.key === b.dataset.k);
+        if (i >= 0) { aiSpeed = i; try { localStorage.setItem('ardennes44_aispeed', aiSpeedCfg().key); } catch (e) {} }
+        paint();
+      });
+      box.querySelector('#aimClose').onclick = () => { SFX.play('click'); $('modal').style.display = 'none'; };
+    };
+    paint();
+  }
+
+  /* —— 25b 「⚙ 开关」浮层：音效 / 档案弹卡 —— */
+  let dosPop = (() => { try { return localStorage.getItem('ardennes44_dospop') !== '0'; } catch (e) { return true; } })();
+  function renderDosPopBtn() {
+    const b = document.getElementById('btnDosPop');
+    if (!b) return;
+    b.textContent = dosPop ? '✉ 档案卡 开' : '✉ 档案卡 关';
+    b.classList.toggle('off', !dosPop);
+  }
+  function toggleSwitchesPop(anchorBtn) {
+    let pop = document.getElementById('swPop');
+    if (pop) { pop.remove(); return; }
+    pop = document.createElement('div');
+    pop.id = 'swPop';
+    pop.innerHTML =
+      '<div class="sw-row"><span class="sw-k">♪ 音效</span><button id="btnSfx" class="sw-btn"></button></div>' +
+      '<div class="sw-row"><span class="sw-k">✉ 档案弹卡</span><button id="btnDosPop" class="sw-btn"></button></div>';
+    document.body.appendChild(pop);
+    const r = anchorBtn.getBoundingClientRect();
+    pop.style.left = Math.min(window.innerWidth - 230, r.right - 190) + 'px';
+    pop.style.top = (r.bottom + 8) + 'px';
+    pop.querySelector('#btnSfx').onclick = () => { SFX.init(); const m = SFX.toggle(); renderSfxBtn(); if (!m) SFX.play('click'); };
+    pop.querySelector('#btnDosPop').onclick = () => {
+      dosPop = !dosPop;
+      try { localStorage.setItem('ardennes44_dospop', dosPop ? '1' : '0'); } catch (e) {}
+      renderDosPopBtn(); SFX.play('click');
+      if (!dosPop && dossierOpen) { dossierQueue = []; $('modal').style.display = 'none'; dossierOpen = false; maybeAI(); }
+    };
+    renderSfxBtn(); renderDosPopBtn();
+    setTimeout(() => {
+      document.addEventListener('click', function close(e) {
+        if (pop.contains(e.target) || e.target === anchorBtn) return;
+        pop.remove();
+        document.removeEventListener('click', close);
+      });
+    }, 0);
   }
 
   function showRulesModal() {
@@ -7343,7 +7716,7 @@ globalThis.UI = (function () {
     reinBuf = []; if (reinTimer) { clearTimeout(reinTimer); reinTimer = 0; }
     dossierQueue = []; dossierShown = new Set(); dossierOpen = false;
     game = new Game(scenarioId, undefined, saved, opts);
-    window.__game = game;
+    window.__game = game; window.__renderer = renderer;   // 25g: 诊断挂载
     // 成就与战绩：挂载（读档时 achvRole 为 null → 不传 meta，沿用存档里的 achvTrack.meta）
     achvLastNew = [];
     if (typeof Achv !== 'undefined') {
@@ -7712,16 +8085,23 @@ globalThis.UI = (function () {
     renderer.onHexClick = onHexClick;
     renderer.onHexHover = onHexHover;
     $('btnEnd').onclick = () => { if (!aiBusy && game && !game.state.over) { exitAdvance(); game.endPhase(); } };
-    $('btnAIde').onclick = () => { SFX.play('click'); aiDE = !aiDE; $('btnAIde').classList.toggle('active', aiDE); maybeAI(); };
-    $('btnAIus').onclick = () => { SFX.play('click'); aiUS = !aiUS; $('btnAIus').classList.toggle('active', aiUS); maybeAI(); };
     $('btnOOB').onclick = showUnitsModal;
     $('btnAchv').onclick = () => { SFX.play('click'); showAchvModal('wall'); };
+    // —— 25b 撤子/暂停/AI 指挥/开关浮层 ——
+    const _bu = document.getElementById('btnUndo');
+    if (_bu) _bu.onclick = () => { SFX.play('click'); doUndo(); };
+    const _bp = document.getElementById('btnPause');
+    if (_bp) _bp.onclick = togglePause;
+    const _bai = document.getElementById('btnAI');
+    if (_bai) _bai.onclick = () => { SFX.play('click'); showAIModal(); };
+    const _bt = document.getElementById('btnToggles');
+    if (_bt) _bt.onclick = (e) => { e.stopPropagation(); SFX.play('click'); toggleSwitchesPop(_bt); };
     $('btnRules').onclick = showRulesModal;
     $('btnRestart').onclick = () => { SFX.play('click'); showStartModal(!!localStorage.getItem('ardennes44_save')); };
     $('btnLogToggle').onclick = () => { SFX.play('click'); toggleLogPanel(); };
     // 音效开关（2026-10 第二十二轮）：状态写入 localStorage，关闭时按钮变暗且文字改为「音效 关」
-    $('btnSfx').onclick = () => { SFX.init(); const m = SFX.toggle(); renderSfxBtn(); if (!m) SFX.play('click'); };
-    $('btnAISpeed').onclick = () => { SFX.init(); SFX.play('click'); cycleAiSpeed(); };
+    // 25b: 音效/档案弹卡合并进「⚙ 开关」浮层（见 toggleSwitchesPop）
+
     renderAiSpeedBtn();
     renderSfxBtn();
     /* ---- 窄屏菜单（第二十九轮）：顶栏按钮收入 #topBtns 下拉，由 ☰ 开合 ---- */

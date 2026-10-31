@@ -21,6 +21,7 @@ globalThis.DATA = (function () {
   const RIVER_EXTRA = 1;        // 非桥渡河额外消耗
   const RIVER_ODDS_SHIFT = -1;  // 渡河攻击 战力比降一档
   const ARMOR_VS_SOFT_SHIFT = 1;// 纯装甲 vs 无反装甲守方(开阔) 升一档
+  const SUPPLY_DISABLED = false;   // 26g: 师级剧本置 true → 取消补给机制（默认关闭，旧剧本逐位不变）
   const SUPPLY_R_HQ = 7;        // 指挥部补给半径
   const SUPPLY_R_TOWN = 7;      // 补给点城镇半径
   // —— 断补详细规则(2026-10 用户需求): 断补不再立即生效, 有宽限期, 且按兵种分档 ——
@@ -159,6 +160,8 @@ globalThis.DATA = (function () {
   };
   const ODDS_ORDER = ['1:4', '1:3', '1:2', '1:1', '2:1', '3:1', '4:1', '5:1', '6:1'];
   // 战斗伤害(组织度): 攻方/守方 — DE/EX调低以避免守方过快消失
+  const DMG_SCALE = 1;      // 26k: 伤害倍率（师级剧本 2.5，与放大的组织度匹配；默认 1 旧剧本不变）
+  const RECOVER_SCALE = 1;  // 26k: 整补倍率
   const DMG = {
     AE: { atk: 7, def: 0 }, AR: { atk: 2, def: 0, atkRetreat: true },
     EX: { atk: 3, def: 4 }, DR: { atk: 0, def: 3, defRetreat: true },
@@ -302,11 +305,11 @@ globalThis.DATA = (function () {
     ['d39', '第212国民掷弹兵团·2团', '212VG2', 'VGD', 3, 4, 4, 39, 27, 0, 9],
     ['d40', '第276国民掷弹兵团', '276VG', 'VGD', 3, 4, 4, 39, 28, 0, 9],
     ['d41', '第276国民掷弹兵团·2团', '276VG2', 'VGD', 3, 4, 4, 38, 29, 0, 9],
-    ['d42', '元首卫队旅装甲营', 'FB装营', 'ARM', 8, 6, 7, 41, 20, 3, 10],
+    ['d42', '最高统帅部护卫旅装甲营', 'FB装营', 'ARM', 8, 6, 7, 41, 20, 3, 10],
     ['d43', '第7集团军炮兵营', '7集炮', 'ART', 5, 1, 3, 39, 24, 0, 10],
     ['d44', '第7集团军部', '7集司', 'HQ', 1, 3, 6, 40, 25, 0, 10],
     // ===== 全战役剧本后期增援 =====
-    ['d45', '元首掷弹旅装甲营', 'FG装营', 'ARM', 8, 6, 7, 45, 14, 14, 10],
+    ['d45', '最高统帅部掷弹兵旅装甲营', 'FG装营', 'ARM', 8, 6, 7, 45, 14, 14, 10],
     ['d46', '格奈森瑙步兵团', '格奈团', 'INF', 4, 4, 5, 45, 18, 16, 10],
     ['d47', '第9装甲营', '9装营', 'ARM', 8, 6, 7, 45, 22, 15, 10],
     // ===== 师属第二团/加强炮兵(史实编制补全) =====
@@ -504,7 +507,7 @@ globalThis.DATA = (function () {
   /* ---------------- 史实事件注记 ---------------- */
   const EVENTS = {
     1:  '12月16日 05:30，德军三个集团军在130公里正面发起总攻，美军第8军防区猝不及防，炮火映红了雪原。',
-    2:  '12月17日，派佩尔战斗群在马尔梅迪公路枪杀美军战俘；第106师两个团在雪艾菲尔山陷入重围；圣维特告急。',
+    2:  '12月17日，马尔梅迪事件发生；第106师两个团在雪艾菲尔山陷入重围；圣维特告急。',
     3:  '12月18日，第101空降师连夜卡车机动进驻巴斯托涅；第82空降师抢占维尔萨姆一线；派佩尔兵锋抵达斯塔沃洛。',
     4:  '12月19日，党卫军第12装甲师猛攻埃尔森博恩岭，被第2、99步兵师死死顶住；艾森豪威尔在凡尔登召开危机会议。',
     5:  '12月20日，巴斯托涅陷于合围；第1、第9集团军划归巴顿指挥；美第7装甲师在圣维特以东且战且退。',
@@ -523,7 +526,7 @@ globalThis.DATA = (function () {
     17: '1月2日，突出部内德军补给濒于断绝，公路被美机昼夜封锁。',
     18: '1月3日，美第1、第3集团军自南北两面对攻，阿登转入全面反攻。',
     19: '1月5日，德军防线处处告急，莫德尔请求后撤被拒。',
-    20: '1月8日，希特勒终于下令德军撤出突出部，为时已晚。',
+    20: '1月8日，德军最高统帅部终于下令德军撤出突出部，为时已晚。',
     21: '1月10日，美军多路追击，德军后卫依托河川逐次抵抗。',
     22: '1月12日，苏军发起维斯瓦河攻势，德军预备队被迫东调——西线的命运就此注定。',
     23: '1月15日，突出部内德军且战且退，桥梁一部被工兵炸毁。',
@@ -549,7 +552,7 @@ globalThis.DATA = (function () {
   const SCENARIOS = {
     standard: {
       id: 'standard',
-      name: '突出部（标准）',
+      name: '突出部战役（团级）',
       sub: '1944.12.16 – 12.27 · 德军攻势窗口 · 12回合',
       desc: '纯攻防的紧张推演：德军须在时间耗尽前冲出马斯河或夺取两大枢纽，美军且战且退、等天气放晴。',
       rounds: 12,
@@ -561,7 +564,7 @@ globalThis.DATA = (function () {
     },
     campaign: {
       id: 'campaign',
-      name: '阿登全战役',
+      name: '阿登全战役（团级）',
       sub: '1944.12.16 – 1945.1.16 · 攻势与反攻 · 24回合',
       desc: '两阶段全战役：前12回合德军进攻，第13回合起攻守易势，美军反攻削平突出部。',
       rounds: 24,
@@ -602,8 +605,8 @@ globalThis.DATA = (function () {
       name: '第7装甲师',
       strength: '第17/31/40坦克营、第23装甲步兵营 等',
       histDate: '1944-12-17',
-      photo: CDN_WM + '6/69/M4_Sherman_tanks_of_the_U.S._7th_Armored_Division_near_St._Vith%2C_Belgium%2C_24_January_1945_%28148727210%29.jpg',
-      photoCaption: '第7装甲师的 M4 谢尔曼坦克，圣维特附近（1945年1月）',
+      photo: 'embed:ph26u',
+      photoCaption: '',
       intro: '第7装甲师自12月17日起陆续投入圣维特方向，与第106步兵师残部、第9装甲师一部编成临时"圣维特战斗群"。该师在圣维特周边反复阻击，为盟军向西集结争取时间，直至12月23日奉命放弃该城西撤。整个战役期间伤亡、被俘约三千余人。',
     },
     {
@@ -611,8 +614,8 @@ globalThis.DATA = (function () {
       name: '第101空降师「啸鹰」',
       strength: '第501/502/506伞兵团、第327滑翔步兵团、第321滑翔炮兵营',
       histDate: '1944-12-18',
-      photo: CDN_WM + 'd/d3/101st_Airborne_troops_move_out_of_Bastogne.jpg',
-      photoCaption: '第101空降师的士兵走出巴斯托涅（1945年1月）',
+      photo: 'embed:ph26u',
+      photoCaption: '',
       intro: '12月18日，第101空降师奉命驰援巴斯托涅，19日凌晨抵达并接手该城防御。此后一周，该师在缺弹药、缺食物、缺御寒装备的情况下被德军合围，依托环形阵地坚守。12月22日德军劝降，代理师长麦考利夫准将回以一句"Nuts!"。12月26日第4装甲师先遣队突入该城，包围被打破——此役使第101空降师成为突出部战役的象征。',
     },
     {
@@ -620,8 +623,8 @@ globalThis.DATA = (function () {
       name: '第82空降师「全美」',
       strength: '第504/505/508伞兵团、第325滑翔步兵团',
       histDate: '1944-12-18',
-      photo: CDN_WM + 'a/a1/82nd_Airborne_drop_pattern%2C_D-Day%2C_6_June_1944.JPG',
-      photoCaption: '第82空降师在诺曼底实施伞降（1944年6月6日，资料照片）',
+      photo: 'embed:ph26u',
+      photoCaption: '',
       intro: '12月18日，第82空降师在圣维特以北展开，接管萨尔姆河一线（所谓"北肩角"）的防御。12月20日圣维特失守后，该师退守昂布莱沃河与萨尔姆河之间，与第30步兵师一起顶住德军第6装甲集团军的突击；其滑翔步兵团于12月21日加入战斗。',
     },
     {
@@ -629,8 +632,8 @@ globalThis.DATA = (function () {
       name: '第10装甲师',
       strength: '第11/20坦克营、第20/23装甲步兵营 等',
       histDate: '1944-12-18',
-      photo: CDN_WM + '5/5d/U.S._10th_Armored_Division_troops_in_Bastogne%2C_Belgium%2C19_December_1944_%28148727462%29.jpg',
-      photoCaption: '第10装甲师部队在巴斯托涅（1944年12月19日）',
+      photo: 'embed:ph26u',
+      photoCaption: '',
       intro: '12月18日，第10装甲师受命分成三个战斗群（Desobry、Cherry、O’Hara）驰援巴斯托涅方向。Desobry 战斗群先期抵达该城东北的 Noville，Cherry 战斗群守住东面的要道，为主力与第101空降师进城争取了宝贵时间。',
     },
     {
@@ -638,8 +641,8 @@ globalThis.DATA = (function () {
       name: '第1步兵师「大红一师」',
       strength: '第16/18/26步兵团',
       histDate: '1944-12-20',
-      photo: CDN_WM + '0/08/26th_Infantry_Regiment_near_Butgenbach.jpg',
-      photoCaption: '第1步兵师第26步兵团，比辰巴赫附近',
+      photo: 'embed:ph26u',
+      photoCaption: '',
       intro: '第1步兵师于12月20日从亚琛方向赶到北翼，在比辰巴赫（Bütgenbach）以南接防，与第99步兵师共同守住突出部北肩。该师在1944年12月下旬至1945年1月间顶住德军多次强攻，是德军第6装甲集团军向西突破的最大障碍之一。',
     },
     {
@@ -647,8 +650,8 @@ globalThis.DATA = (function () {
       name: '第30步兵师「老希科利」',
       strength: '第117/119/120步兵团',
       histDate: '1944-12-21',
-      photo: CDN_WM + '6/63/M7_105-MM._SP_HOWITZER_OF_THE_30TH_DIVISION_IN_ACTION_near_la_Gleize.jpg',
-      photoCaption: '第30步兵师的 M7 105 毫米自行榴弹炮在拉格莱兹附近射击',
+      photo: 'embed:ph26u',
+      photoCaption: '',
       intro: '第30步兵师于12月21日投入斯塔沃洛-马尔梅迪一线，与第82空降师协同封锁派佩尔战斗群（KG Peiper）向西北突进的道路。该师在斯塔沃洛、拉格莱兹（La Gleize）一带逐村争夺，最终配合友军把被围的德军装甲战斗群压缩，迫使其弃车徒步突围。',
     },
     {
@@ -656,8 +659,8 @@ globalThis.DATA = (function () {
       name: '第4装甲师',
       strength: '第8/35/37坦克营、第51装甲步兵营 等',
       histDate: '1944-12-22',
-      photo: CDN_WM + '8/8b/Photograph_of_Tanks_of_the_4th_Armored_Division_-_NARA_-_12010181.jpg',
-      photoCaption: '第4装甲师的坦克（美国国家档案馆 NARA 藏品）',
+      photo: 'embed:ph26u',
+      photoCaption: '',
       intro: '应巴顿将军之命，第4装甲师于12月22日从南面发起解围行动，在冰雪与泥泞中一路北进。12月26日下午，该师第37坦克营的先遣队突入巴斯托涅，与第101空降师会合，打破了德军长达数日的包围——这是突出部战役中最著名的解围行动之一。',
     },
     {
@@ -665,8 +668,8 @@ globalThis.DATA = (function () {
       name: '第17空降师',
       strength: '第194/513/507伞兵团',
       histDate: '1944-12-25',
-      photo: CDN_WM + '3/34/SC_337213_-_Signalmen_of_the_17th_Airborne_Division_are_laying_wire_through_the_town_of_Marnach%2C_Luxembourg%2C_to_an_artillery_observation_post._%2852204180839%29.jpg',
-      photoCaption: '第17空降师通信兵在卢森堡马尔纳赫铺设电话线',
+      photo: 'embed:ph26u',
+      photoCaption: '',
       intro: '第17空降师于1944年12月底至1945年1月初投入阿登战场，接管卢森堡马尔纳赫（Marnach）一带阵地，参与稳定南翼战线、支援巴斯托涅解围后的反攻。该师1944年8月才登陆欧洲，是盟军投入突出部战役的最年轻空降师之一。',
     },
     {
@@ -674,8 +677,8 @@ globalThis.DATA = (function () {
       name: '第3装甲师「矛头」',
       strength: '第32/33坦克营 等',
       histDate: '1944-12-24',
-      photo: CDN_WM + '8/84/USA_3070551_of_the_3rd_Armored_Division_in_Chenee%2C_Belgium%2C_September_8%2C_1944.jpg',
-      photoCaption: '第3装甲师的坦克，比利时谢内（1944年9月）',
+      photo: 'embed:ph26u',
+      photoCaption: '',
       intro: '第3装甲师于1944年12月下旬投入阿登战场，编入第7军，参与北翼的反击与战线稳定，为后续向乌尔特河以东推进积蓄装甲力量。',
     },
     {
@@ -683,8 +686,8 @@ globalThis.DATA = (function () {
       name: '第506重装甲营（虎王）',
       strength: '虎王（Tiger II）重型坦克营',
       histDate: '1944-12-18',
-      photo: CDN_WM + '1/11/German_Tiger_II_tank_in_Stavelot%2C_Belgium%2C_21_December_1944_%28111-SC-198115%29.jpg',
-      photoCaption: '德军虎王坦克，比利时斯塔沃洛（1944年12月21日）',
+      photo: '',
+      photoCaption: '',
       intro: '第506重装甲营装备"虎王"（Tiger II）重型坦克，1944年12月编入德军第6装甲集团军序列投入阿登攻势。虎王火力与装甲防护出众，但机动性差、油耗高，在阿登狭窄泥泞的道路与承重不足的桥梁前反受掣肘，在斯塔沃洛、拉格莱兹等地与盟军展开激烈巷战。',
     },
     {
@@ -692,36 +695,36 @@ globalThis.DATA = (function () {
       name: '党卫军第2装甲师「帝国」',
       strength: '党卫军第2装甲团、党卫军第2装甲掷弹兵团、党卫军第2装甲炮兵营 等',
       histDate: '1944-12-23',
-      photo: CDN_WM + 'e/e2/MortainDasReich.jpg',
-      photoCaption: '"帝国"师在莫尔坦反攻中（1944年8月，诺曼底）',
-      intro: '党卫军第2装甲师"帝国"（Das Reich）于1944年12月下旬调来西线，编入德军第7集团军，参与南翼对巴斯托涅的攻势以及对盟军反攻的抗击。该师此前曾在诺曼底的"莫尔坦"反攻中重创美军，是德军最精锐的装甲部队之一。',
+      photo: '',
+      photoCaption: '',
+      intro: '党卫军第2装甲师"帝国"（Das Reich）于1944年12月下旬调来西线，编入德军第7集团军，参与南翼对巴斯托涅的攻势以及对盟军反攻的抗击。该师此前曾在诺曼底的"莫尔坦"反攻中重创美军，是德军装备较好的装甲部队之一。',
     },
     {
-      key: 'de_fbb', side: 'DE', type: '装甲', match: ['元首卫队旅'],
-      name: '元首卫队旅（Führer-Begleit）',
-      strength: '元首卫队装甲营、装甲掷弹兵 等',
+      key: 'de_fbb', side: 'DE', type: '装甲', match: ['最高统帅部护卫旅'],
+      name: '最高统帅部护卫旅（Führer-Begleit）',
+      strength: '最高统帅部警卫装甲营、装甲掷弹兵 等',
       histDate: '1944-12-18',
-      photo: CDN_WM + 'a/ad/German_Tiger_II_tank_passes_American_prisoners%2C_16_December_1944_%28111-SC-198241%29.jpg',
-      photoCaption: '1944年12月16日，德军虎王坦克经过被俘美军（资料照片）',
-      intro: '元首卫队旅（Führer-Begleit-Brigade）最初是希特勒大本营的护卫部队，1944年12月扩编为旅级装甲战斗群投入阿登攻势，配属第5装甲集团军，参与中路向马斯河方向的突击。',
+      photo: '',
+      photoCaption: '',
+      intro: '最高统帅部护卫旅（Führer-Begleit-Brigade）最初是德军最高统帅部大本营的护卫部队，1944年12月扩编为旅级装甲战斗群投入阿登攻势，配属第5装甲集团军，参与中路向马斯河方向的突击。',
     },
     {
       key: 'de_3pg', side: 'DE', type: '装甲掷弹兵', match: ['第3装掷师'],
       name: '第3装甲掷弹兵师',
       strength: '第8/29装甲掷弹兵团、第103装甲营 等',
       histDate: '1944-12-19',
-      photo: CDN_WM + '6/61/GERMAN_TROOPS_ADVANCING_PAST_ABANDONED_AMERICAN_EQUIPMENT.jpg',
-      photoCaption: '阿登战役中德军部队越过被弃置的美军装备（资料照片）',
+      photo: '',
+      photoCaption: '',
       intro: '第3装甲掷弹兵师在阿登攻势中配属德军第7集团军，负责南翼的掩护与推进，在巴斯托涅以东方向作战，参与切断并威胁该城与南方的联系。',
     },
     {
-      key: 'de_fgb', side: 'DE', type: '装甲', match: ['元首掷弹旅'],
-      name: '元首掷弹旅（Führer-Grenadier）',
-      strength: '元首掷弹旅装甲营、装甲掷弹兵 等',
+      key: 'de_fgb', side: 'DE', type: '装甲', match: ['最高统帅部掷弹兵旅'],
+      name: '最高统帅部掷弹兵旅（Führer-Grenadier）',
+      strength: '最高统帅部掷弹兵旅装甲营、装甲掷弹兵 等',
       histDate: '1945-01-01',
-      photo: CDN_WM + 'e/e2/Captured_German_Panther_tank_crewman_1944.jpg',
-      photoCaption: '一名被俘的德军"黑豹"坦克乘员（1944年）',
-      intro: '元首掷弹旅（Führer-Grenadier-Brigade）与元首卫队旅同源，1944年底扩编，1945年1月初投入阿登战场，参与德军在突出部南翼的最后攻势，此后随战局转为防御。',
+      photo: 'embed:ph26u',
+      photoCaption: '',
+      intro: '最高统帅部掷弹兵旅（Führer-Grenadier-Brigade）与最高统帅部护卫旅同源，1944年底扩编，1945年1月初投入阿登战场，参与德军在突出部南翼的最后攻势，此后随战局转为防御。',
     },
   ];
 
@@ -738,43 +741,43 @@ globalThis.DATA = (function () {
       side: 'DE', degree: '决定性胜利',
       title: '装甲洪流 · 直抵马斯河',
       cheer: '「我们已抵达马斯河。」雪原之上，德军的钢铁洪流碾碎了盟军引以为傲的防线。这是 1940 年以来西线最大胆的一次突破——通往安特卫普的大门，轰然洞开。',
-      photo: CDN_WM + 'a/ad/German_Tiger_II_tank_passes_American_prisoners%2C_16_December_1944_%28111-SC-198241%29.jpg',
-      photoCaption: '1944年12月16日，德军虎王坦克经过被俘美军（资料照片）',
+      photo: 'embed:ph26u',
+      photoCaption: '',
     },
     DE_tactical: {
       side: 'DE', degree: '战术胜利',
       title: '铁拳砸穿阿登',
       cheer: '圣维特、巴斯托涅——两个名字被写进了战史。德军的铁拳在阿登的雪原上砸穿了盟军防线，虽未能发展成合围，却足以让整个西线为之震颤。',
-      photo: CDN_WM + '6/61/GERMAN_TROOPS_ADVANCING_PAST_ABANDONED_AMERICAN_EQUIPMENT.jpg',
-      photoCaption: '阿登战役中德军部队越过被弃置的美军装备（资料照片）',
+      photo: 'embed:ph26u',
+      photoCaption: '',
     },
     DE_hold: {
       side: 'DE', degree: '胜利',
       title: '寸土不让 · 突出部犹在',
       cheer: '盟军的反攻撞上钢铁壁垒，一寸未得。在最寒冷的冬天里，德军守住了用鲜血换来的突出部——战果依然在握。',
-      photo: CDN_WM + '1/11/German_Tiger_II_tank_in_Stavelot%2C_Belgium%2C_21_December_1944_%28111-SC-198115%29.jpg',
-      photoCaption: '德军虎王坦克，比利时斯塔沃洛（1944年12月21日）',
+      photo: 'embed:ph26u',
+      photoCaption: '',
     },
     US_decisive: {
       side: 'US', degree: '决定性胜利',
       title: '「Nuts!」',
       cheer: '「Nuts!」——从巴斯托涅到圣维特，德军的每一次突击都撞在钢铁防线上。目标尽失、损失惨重的敌军狼狈退回出发地。阿登的雪原，因你们而自由。',
-      photo: CDN_WM + 'd/d3/101st_Airborne_troops_move_out_of_Bastogne.jpg',
-      photoCaption: '第101空降师的士兵走出巴斯托涅（1945年1月）',
+      photo: 'embed:ph26u',
+      photoCaption: '',
     },
     US_win: {
       side: 'US', degree: '胜利',
       title: '最后的赌注 · 输光了',
       cheer: '德军最后的赌注输光了。突出部被挡住、被削平——阿登的雪原上，盟军的旗帜依然高高飘扬。你们守住的不只是一条防线，而是欧洲的黎明。',
-      photo: CDN_WM + '8/8b/Photograph_of_Tanks_of_the_4th_Armored_Division_-_NARA_-_12010181.jpg',
-      photoCaption: '第4装甲师的坦克（美国国家档案馆 NARA 藏品）',
+      photo: 'embed:ph26u',
+      photoCaption: '',
     },
     US_pyrrhic: {
       side: 'US', degree: '惨胜',
       title: '惨胜 · 亦是胜',
       cheer: '突出部最终被削平，代价却异常沉重——德军主力得以脱身。这是一场胜利，更是一记警钟：自由从来不是廉价的。擦干血与雪，前路仍有硬仗。',
-      photo: CDN_WM + '6/63/M7_105-MM._SP_HOWITZER_OF_THE_30TH_DIVISION_IN_ACTION_near_la_Gleize.jpg',
-      photoCaption: '第30步兵师的 M7 105 毫米自行榴弹炮在拉格莱兹附近射击',
+      photo: 'embed:ph26u',
+      photoCaption: '',
     },
     /* 取消回合限制 / 歼灭模式（第二十三轮）：一方全部建制（含援军）被消灭时的专属终局画面。
      * degree 用"歼灭胜利"与上面六组的"决定性/战术/惨胜"区分开，一眼能看出这是歼灭战的结果。 */
@@ -782,15 +785,15 @@ globalThis.DATA = (function () {
       side: 'DE', degree: '歼灭胜利',
       title: '清扫战场 · 再无盟军一兵一卒',
       cheer: '雪原上的枪声稀疏下去。从艾费尔到马斯河，美军的每一个番号都被从态势图上抹去——包括那些日夜兼程赶来的增援。这场豪赌押上了最后一块筹码，也赢下了最后的胜利。',
-      photo: CDN_WM + 'e/e2/MortainDasReich.jpg',
-      photoCaption: '德军装甲部队在反攻中推进（1944年，资料照片）',
+      photo: 'embed:ph26u',
+      photoCaption: '',
     },
     US_annihilation: {
       side: 'US', degree: '歼灭胜利',
       title: '钢铁洪流 · 尽数折戟阿登',
       cheer: '德军最后的家底——从党卫装甲师到国民掷弹兵，连同它们苦苦等来的每一支援军——都在阿登的雪原上化为废铁。没有突围，没有撤退：突出部成了一口吞下整支德军的口袋。',
-      photo: CDN_WM + '6/69/M4_Sherman_tanks_of_the_U.S._7th_Armored_Division_near_St._Vith%2C_Belgium%2C_24_January_1945_%28148727210%29.jpg',
-      photoCaption: '美军第7装甲师的 M4 谢尔曼坦克，比利时圣维特附近（1945年1月）',
+      photo: 'embed:ph26u',
+      photoCaption: '',
     },
   };
 
@@ -805,13 +808,13 @@ globalThis.DATA = (function () {
       side: 'DE',
       name: '瓦尔特·莫德尔 陆军元帅',
       post: 'B集团军群司令 · "守望莱茵"行动总指挥',
-      photo: CDN_WM + '8/84/Bundesarchiv_Bild_183-J27784%2C_Arnheim%2C_Walter_Model%2C_Heinz_Harmel.jpg',
-      photoCaption: 'B集团军群司令莫德尔在阿纳姆前线（1944年9月）',
-      credit: '照片：维基共享资源 · 德国联邦档案 Bundesarchiv Bild 183-J27784（CC BY-SA 3.0 DE）｜ 加载失败时显示档案插图',
+      photo: 'embed:ph26u',
+      photoCaption: '',
+      credit: '',
       intro: [
         '我是瓦尔特·莫德尔，B集团军群司令。12月16日凌晨5点30分，上千门火炮在阿登同时开火——「守望莱茵」行动，开始了。',
         '奇袭已经得手。大雾把盟军的空中优势锁死在地面上；美军第8军正面（第106、第99师这些新部队）被我们的三路突击凿开——第6装甲集团军走北路，第5装甲集团军走中路，第7集团军掩护南翼。',
-        '这个计划连一公里都推进不了——这话是我亲口对元首说的，当时我还多要了三十个师。命令没有改，那就把它打成事实：这一仗只许成功。',
+        '这个计划连一公里都推进不了——这话是我亲口向最高统帅部说的，当时我还多要了三十个师。命令没有改，那就把它打成事实：这一仗只许成功。',
         '出发时我们只带了够走一半的油。斯塔沃洛、斯帕的美军油库是装甲矛头的命脉；而阿登一放晴，盟军的飞机就会回来——留给我们的窗口只有一个星期。',
       ],
       // 取消回合限制 / 歼灭模式（第二十三轮）：追加的局势段与目标段
@@ -831,9 +834,9 @@ globalThis.DATA = (function () {
       side: 'US',
       name: '奥马尔·布莱德雷 中将',
       post: '第12集团军群司令',
-      photo: CDN_WM + '1/1a/General_of_the_Army_Omar_Bradley_%28crop%29.jpg',
-      photoCaption: '奥马尔·布莱德雷（美国陆军官方肖像）',
-      credit: '照片：维基共享资源 · 美国陆军官方肖像（公有领域 PD）｜ 加载失败时显示档案插图',
+      photo: 'embed:ph26u',
+      photoCaption: '',
+      credit: '',
       intro: [
         '我是奥马尔·布莱德雷，第12集团军群司令。12月16日拂晓，德军在你最没想到的方向——阿登——发起了总攻。这道口子，是德国人用最后的家底赌出来的。',
         '阿登一直被当成"安静防区"，第106、第99师这些新部队正在那里休整。现在德军3个集团军压了过来，第8军的正面被凿穿。能挡住他们的，暂时只有你手头这点兵力。',
@@ -864,7 +867,7 @@ globalThis.DATA = (function () {
     VICTORY,
     BRIEFINGS,
     ROAD_COST, RIVER_EXTRA, RIVER_ODDS_SHIFT, ARMOR_VS_SOFT_SHIFT,
-    SUPPLY_R_HQ, SUPPLY_R_TOWN, BUFFS,
+    DMG_SCALE, RECOVER_SCALE, SUPPLY_DISABLED, SUPPLY_R_HQ, SUPPLY_R_TOWN, BUFFS,
     UNSUP_GRACE, UNSUP_INF_MOD, UNSUP_NONINF_MOD,
     DE_AIR_FROM, DE_AIR_PER_CLEAR, DE_AIR_BODENPLATTE_ROUND, DE_AIR_BODENPLATTE_TOKENS, AIR_ATK,
     AA_REDUCE_CHANCE, AA_REDUCE_MULT, PASSIVE,

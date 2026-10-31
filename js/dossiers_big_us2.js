@@ -10,7 +10,7 @@ const SHARD_US2 = [
     strength: '第21/41/42坦克营、第11/55/63装甲步兵营、第41装A营',
     histDate: '1944-12-30（增援）',
     intro: '新组建的师，首次实战就在12月30日投入塞勒斯-乌法利兹方向的反击。在诺维尔东南与德军第2装甲师残部交战，初期因缺乏经验损失较大，1月中旬随第三集团军向乌尔河方向全线推进。',
-    photo: 'https://upload.wikimedia.org/wikipedia/commons/c/c7/2346957_Tanks_of_the_11th_Armored_Division%2C_Third_U.S._Army%2C_advance_along_the_Autobahn_near_Frankfurt%2C_Germany%2C_March_31%2C_1945.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original' },
+    photo: 'embed:ph26u' },
 
   { key: 'us_17abn', side: 'US', branch: '美军', open: false,
     match: ['第17空降师'],
@@ -19,7 +19,7 @@ const SHARD_US2 = [
     strength: '第513/517/193/194滑翔步兵团、第466空降炮兵营',
     histDate: '1945-01-04（增援）',
     intro: '全师首次实战：1月4日在 Flamizoulle-莫泰汉方向投入反击，遭遇德军"北风行动"南翼的顽强抵抗，滑翔机步兵伤亡惨重。1月7日起在第87师配合下沿乌尔特河向豪法利兹方向推进。',
-    photo: 'https://upload.wikimedia.org/wikipedia/commons/3/34/SC_337213_-_Signalmen_of_the_17th_Airborne_Division_are_laying_wire_through_the_town_of_Marnach%2C_Luxembourg%2C_to_an_artillery_observation_post._%2852204180839%29.jpg' },
+    photo: 'embed:ph26u' },
 
   { key: 'us_87id', side: 'US', branch: '美军', open: false,
     match: ['第87步兵师'],
@@ -28,7 +28,7 @@ const SHARD_US2 = [
     strength: '第345/346/347步兵团、师属炮兵、歼击/工兵营',
     histDate: '1944-12-30（增援）',
     intro: '1月1日首战即投入乌尔特河与萨尔姆河之间的反击，与德军党卫军第9装甲师反复拉锯，1月中旬在豪法利兹方向推进顺利。',
-    photo: 'https://upload.wikimedia.org/wikipedia/commons/b/ba/Engineers_of_the_87th_Division_fery_a_tank_across_the_Moselle.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original' },
+    photo: 'embed:ph26u' },
 
   { key: 'us_83id', side: 'US', branch: '美军', open: false,
     match: ['第83步兵师'],
@@ -46,7 +46,7 @@ const SHARD_US2 = [
     strength: '第333/334/335步兵团、师属炮兵、歼击/工兵营',
     histDate: '1944-12-23（增援）',
     intro: '12月23日投入马尔什方向的防御，随后作为第二集团军主力参与12月25-26日塞勒斯合围圈反击——与第2装甲师一起歼灭德军第2装甲师主力，战役转折点之一。',
-    photo: 'https://upload.wikimedia.org/wikipedia/commons/a/a1/SC_201528_-_Members_of_a_weapons_platoon_of_the_84th_Infantry_%22Railsplitter%22_Division_try_out_German_bicycles%2C_the_spoils_of_one_of_their_recent_battles._Rickelrath%2C_Germany._28_February%2C_1945._%2853006543866%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original' },
+    photo: 'embed:ph26u' },
 
   { key: 'us_75id', side: 'US', branch: '美军', open: false,
     match: ['第75步兵师'],
@@ -55,7 +55,7 @@ const SHARD_US2 = [
     strength: '第289/290/291步兵团、师属炮兵、歼击/工兵营',
     histDate: '1944-12-25（增援）',
     intro: '首次实战即投入马尔梅迪-利厄日方向防御，填补第30师北移后的空缺。在1945年1月初的大雪中沿马斯河一线巡逻戒备。',
-    photo: 'https://upload.wikimedia.org/wikipedia/commons/9/94/SC_329979_-_U.S._Army_infantrymen_of_the_75th_Infantry_Division_pass_through_Arbrefontaine%2C_Belgium%2C_on_their_way_to_new_objective._17_January%2C_1945._%2852593182342%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original' },
+    photo: 'embed:ph26u' },
 
   { key: 'us_5id', side: 'US', branch: '美军', open: false,
     match: ['第5步兵师'],
@@ -64,7 +64,7 @@ const SHARD_US2 = [
     strength: '第2/10/11步兵团、师属炮兵、歼击/工兵营',
     histDate: '1944-12-25（增援）',
     intro: '巴顿第三集团军的老部队。12月下旬在南翼投入，沿绍尔河与苏雷河一线挡住德军第7集团军东撤与"北风"反扑，为1月第三集团军大反击建立出发阵地。',
-    photo: 'https://upload.wikimedia.org/wikipedia/commons/a/aa/Soldiers_of_the_U.S._5th_Infantry_Division_in_the_ruins_of_Bitburg%2C_Germany%2C_28_February_1945_%28148727218%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original' },
+    photo: 'embed:ph26u' },
 
   { key: 'us_80id', side: 'US', branch: '美军', open: false,
     match: ['第80步兵师'],
@@ -100,7 +100,7 @@ const SHARD_US2 = [
     strength: '第357/358/359步兵团、师属炮兵、歼击/工兵营',
     histDate: '1944-12-25（增援）',
     intro: '巴顿麾下最能打的师之一。12月底投入南翼反击，1月初沿绍尔河-乌尔河之间向东北方向推进，为第三集团军打通了向豪法利兹方向的反击走廊。',
-    photo: 'https://upload.wikimedia.org/wikipedia/commons/d/d1/Artillerymen_of_a_cannon_company_of_the_U.S._Army%E2%80%99s_90th_Infantry_Division_fire_an_M3_105mm_howitzer_near_Carentan%2C_France_on_11_June_1944.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original' },
+    photo: 'embed:ph26u' },
 
   { key: 'us_6ad', side: 'US', branch: '美军', open: false,
     match: ['第6装甲师'],
